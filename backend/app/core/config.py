@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     )
 
     # ── Database ──────────────────────────────────────────────
-    database_url: str = "sqlite+aiosqlite:///./linguist_guardian.db"
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/linguist_guardian"
 
     # ── OpenAI ────────────────────────────────────────────────
     openai_api_key: str = ""

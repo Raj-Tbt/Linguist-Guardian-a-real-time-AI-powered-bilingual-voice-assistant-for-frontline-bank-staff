@@ -10,7 +10,7 @@
  *   └──────────────┴────────────────┘
  *
  * Features:
- *   • Session creation and selection
+ *   • Session creation — session ID shared with customer
  *   • Real-time chat with WebSocket
  *   • Text input + microphone capture
  *   • Compliance monitoring panel
@@ -37,12 +37,12 @@ export default function StaffDashboard() {
   const [fsmState, setFSMState] = useState({});
   const [textInput, setTextInput] = useState('');
   const [processType, setProcessType] = useState('account_opening');
+  const [copiedId, setCopiedId] = useState(false);
 
   // ── WebSocket message handler ──────────────────────────────
   const handleWSMessage = useCallback((msg) => {
     switch (msg.type) {
       case 'transcription':
-        // STT result — add as a pending message with transcription
         setMessages((prev) => [
           ...prev,
           {
@@ -56,7 +56,6 @@ export default function StaffDashboard() {
         break;
 
       case 'translation':
-        // Update last customer message with translation + intent
         setMessages((prev) => {
           const updated = [...prev];
           const lastCustomerIdx = updated.findLastIndex((m) => m.role === 'customer');
@@ -119,7 +118,7 @@ export default function StaffDashboard() {
     try {
       const session = await createSession({
         staff_name: 'Staff Agent',
-        language: 'hi',
+        language: 'en',
         process_type: processType,
       });
       setSessionId(session.id);
@@ -131,6 +130,14 @@ export default function StaffDashboard() {
       setFSMState(fsm);
     } catch (err) {
       console.error('Failed to create session:', err);
+    }
+  };
+
+  const handleCopySessionId = () => {
+    if (sessionId) {
+      navigator.clipboard.writeText(sessionId);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
     }
   };
 
@@ -215,12 +222,36 @@ export default function StaffDashboard() {
                 </button>
               </div>
             ) : (
-              <span className="badge-info text-xs">
-                Session: {sessionId.slice(0, 8)}…
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCopySessionId}
+                  className="badge-info text-xs cursor-pointer hover:bg-indigo-500/20 transition-colors flex items-center gap-1"
+                  title="Click to copy session ID"
+                >
+                  📋 {copiedId ? 'Copied!' : `Session: ${sessionId.slice(0, 8)}…`}
+                </button>
+              </div>
             )}
           </div>
         </div>
+
+        {/* Session sharing banner */}
+        {sessionId && isConnected && (
+          <div className="mt-3 glass-card p-3 flex items-center justify-between bg-emerald-500/5 border-emerald-500/20">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="text-emerald-400">✅</span>
+              <span className="text-gray-300">
+                Session active — Customer can now join from their dashboard
+              </span>
+            </div>
+            <button
+              onClick={handleCopySessionId}
+              className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              {copiedId ? '✓ Copied' : '📋 Copy ID'}
+            </button>
+          </div>
+        )}
       </header>
 
       {!sessionId ? (
@@ -232,7 +263,8 @@ export default function StaffDashboard() {
               Welcome to Linguist-Guardian
             </h2>
             <p className="text-gray-400 mb-6">
-              Select a process type and create a new session to begin.
+              Select a process type and create a new session to begin.<br/>
+              The customer will be able to join your session automatically.
             </p>
             <button onClick={handleCreateSession} className="btn-primary">
               🚀 Start New Session
@@ -241,7 +273,7 @@ export default function StaffDashboard() {
         </div>
       ) : (
         /* Main layout */
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-160px)]">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)]">
           {/* Left column — Chat */}
           <div className="lg:col-span-2 flex flex-col gap-4">
             <div className="flex-1 min-h-0">
@@ -268,7 +300,7 @@ export default function StaffDashboard() {
                 value={textInput}
                 onChange={(e) => setTextInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Type a message (English or Hindi)…"
+                placeholder="Type a message in English…"
                 className="glass-input flex-1 text-sm"
               />
 

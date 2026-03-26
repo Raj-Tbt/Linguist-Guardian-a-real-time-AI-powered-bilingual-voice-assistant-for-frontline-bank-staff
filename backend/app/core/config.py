@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # ── OpenAI ────────────────────────────────────────────────
     openai_api_key: str = ""
 
+    # ── Sarvam AI ─────────────────────────────────────────────
+    sarvam_api_key: str = ""
+
     # ── Whisper ───────────────────────────────────────────────
     whisper_mode: str = "mock"  # "mock" | "api"
 
@@ -52,6 +55,11 @@ class Settings(BaseSettings):
     def openai_enabled(self) -> bool:
         """Check whether a real OpenAI key is configured."""
         return bool(self.openai_api_key and self.openai_api_key.strip())
+
+    @property
+    def sarvam_enabled(self) -> bool:
+        """Check whether a Sarvam AI API key is configured."""
+        return bool(self.sarvam_api_key and self.sarvam_api_key.strip())
 
 
 @lru_cache()

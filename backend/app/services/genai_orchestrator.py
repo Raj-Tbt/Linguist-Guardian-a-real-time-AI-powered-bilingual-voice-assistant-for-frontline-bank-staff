@@ -3,12 +3,11 @@ Linguist-Guardian — GenAI Orchestrator Service.
 
 Single service that handles:
   • Intent detection from customer text
-  • Bilingual translation (Hindi ↔ English)
+  • Multilingual translation (8 Indian languages ↔ English)
   • Returns structured JSON: { intent, translated_text, confidence }
 
-Uses OpenAI GPT-4o when API key is available, otherwise falls back
-to a deterministic mock that maps keywords to intents and uses a
-small translation dictionary.
+Uses Sarvam AI for translation when available, OpenAI GPT-4o for
+intent detection when configured, otherwise falls back to mock mode.
 """
 
 from __future__ import annotations
@@ -18,6 +17,7 @@ from typing import Optional
 
 from app.core.config import settings
 from app.core.logging import logger
+from app.services import sarvam_translate
 
 
 # ── Intent keyword map (used for mock mode) ──────────────────
@@ -52,32 +52,6 @@ _INTENT_KEYWORDS: dict[str, list[str]] = {
     ],
 }
 
-# ── Small Hindi ↔ English dictionary (mock translation) ──────
-_MOCK_TRANSLATIONS_HI_EN: dict[str, str] = {
-    "नमस्ते": "Hello",
-    "मुझे लोन चाहिए": "I want a loan",
-    "मेरा बैलेंस बताइए": "Please tell me my balance",
-    "नया खाता खोलना है": "I want to open a new account",
-    "ब्याज दर क्या है": "What is the interest rate",
-    "पैसे भेजने हैं": "I need to send money",
-    "मेरा कार्ड ब्लॉक कर दीजिए": "Please block my card",
-    "शिकायत दर्ज करनी है": "I want to file a complaint",
-    "मुझे लोन के बारे में जानकारी चाहिए": "I want information about a loan",
-    "खाता खोलने की प्रक्रिया बताइए": "Please explain the account opening process",
-    "कितना ब्याज लगेगा": "How much interest will be charged",
-}
-
-_MOCK_TRANSLATIONS_EN_HI: dict[str, str] = {v: k for k, v in _MOCK_TRANSLATIONS_HI_EN.items()}
-
-
-def _detect_language(text: str) -> str:
-    """
-    Simple heuristic: if text contains Devanagari characters → 'hi', else 'en'.
-    """
-    if re.search(r"[\u0900-\u097F]", text):
-        return "hi"
-    return "en"
-
 
 def _mock_detect_intent(text: str) -> tuple[str, float]:
     """
@@ -100,21 +74,6 @@ def _mock_detect_intent(text: str) -> tuple[str, float]:
     return best_intent, confidence
 
 
-def _mock_translate(text: str, source_lang: str) -> str:
-    """
-    Return a mock translation. If an exact match exists in the
-    dictionary, use it; otherwise apply a simple prefix marker.
-    """
-    if source_lang == "hi":
-        if text in _MOCK_TRANSLATIONS_HI_EN:
-            return _MOCK_TRANSLATIONS_HI_EN[text]
-        return f"[Translated from Hindi] {text}"
-    else:
-        if text in _MOCK_TRANSLATIONS_EN_HI:
-            return _MOCK_TRANSLATIONS_EN_HI[text]
-        return f"[हिंदी अनुवाद] {text}"
-
-
 # ━━━━━━━━━━━━━━━━  Public API  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async def process_text(
@@ -124,34 +83,38 @@ async def process_text(
     """
     Main orchestrator entry-point.
 
-    1. Detect source language
+    1. Detect source language (supports 8 Indian scripts)
     2. Detect intent
-    3. Translate to target language
+    3. Translate to target language using Sarvam AI
     4. Return structured JSON
 
     Args:
         text: Input text (customer or staff utterance).
-        target_language: Target language code ('en' or 'hi').
-                         If None, auto-flips from detected source.
+        target_language: Target language code (e.g. 'en', 'hi', 'mr').
+                         If None, auto-flips to 'en' for Indian langs
+                         or 'hi' for English.
 
     Returns:
         dict with keys: intent, translated_text, confidence,
         source_language, target_language
     """
-    source_lang = _detect_language(text)
+    source_lang = sarvam_translate.detect_language(text)
     if target_language is None:
-        target_language = "en" if source_lang == "hi" else "hi"
+        target_language = "en" if source_lang != "en" else "hi"
 
+    # ── Intent detection ──────────────────────────────────────
     if settings.openai_enabled:
-        return await _process_with_openai(text, source_lang, target_language)
+        intent, confidence = await _detect_intent_openai(text)
+    else:
+        intent, confidence = _mock_detect_intent(text)
 
-    # ── Mock mode ─────────────────────────────────────────────
-    intent, confidence = _mock_detect_intent(text)
-    translated = _mock_translate(text, source_lang)
+    # ── Translation via Sarvam AI ─────────────────────────────
+    translated = await sarvam_translate.translate(text, source_lang, target_language)
 
     logger.info(
-        "GenAI mock — intent=%s conf=%.2f src=%s tgt=%s",
+        "GenAI — intent=%s conf=%.2f src=%s tgt=%s sarvam=%s",
         intent, confidence, source_lang, target_language,
+        "yes" if settings.sarvam_enabled else "mock",
     )
 
     return {
@@ -163,32 +126,23 @@ async def process_text(
     }
 
 
-async def _process_with_openai(
-    text: str,
-    source_lang: str,
-    target_lang: str,
-) -> dict:
+async def _detect_intent_openai(text: str) -> tuple[str, float]:
     """
-    Use OpenAI GPT-4o for intent detection + translation.
-
-    Sends a single prompt that asks the model to return both
-    the intent and translation in a JSON object.
+    Use OpenAI GPT-4o for intent detection only.
+    Translation is handled by Sarvam AI separately.
     """
     try:
+        import json
         import openai
 
         client = openai.AsyncOpenAI(api_key=settings.openai_api_key)
 
-        src_name = "Hindi" if source_lang == "hi" else "English"
-        tgt_name = "Hindi" if target_lang == "hi" else "English"
-
         system_prompt = (
-            "You are a banking assistant AI. Given customer text, "
-            "return a JSON object with exactly two keys:\n"
+            "You are a banking assistant AI. Given customer text in any language, "
+            "return a JSON object with exactly one key:\n"
             '  "intent" — one of: loan_inquiry, account_opening, '
             "balance_inquiry, fund_transfer, card_services, complaint, "
             "greeting, general_query\n"
-            f'  "translated_text" — the text translated from {src_name} to {tgt_name}\n'
             "Return ONLY valid JSON, nothing else."
         )
 
@@ -199,30 +153,14 @@ async def _process_with_openai(
                 {"role": "user", "content": text},
             ],
             temperature=0.1,
-            max_tokens=300,
+            max_tokens=100,
         )
 
-        import json
         result = json.loads(response.choices[0].message.content)
-
-        logger.info("GenAI OpenAI — intent=%s", result.get("intent"))
-
-        return {
-            "intent": result.get("intent", "general_query"),
-            "translated_text": result.get("translated_text", text),
-            "confidence": 0.95,
-            "source_language": source_lang,
-            "target_language": target_lang,
-        }
+        intent = result.get("intent", "general_query")
+        logger.info("Intent (OpenAI): %s", intent)
+        return intent, 0.95
 
     except Exception as exc:
-        logger.error("OpenAI call failed, falling back to mock: %s", exc)
-        intent, confidence = _mock_detect_intent(text)
-        translated = _mock_translate(text, source_lang)
-        return {
-            "intent": intent,
-            "translated_text": translated,
-            "confidence": confidence,
-            "source_language": source_lang,
-            "target_language": target_lang,
-        }
+        logger.error("OpenAI intent detection failed: %s", exc)
+        return _mock_detect_intent(text)

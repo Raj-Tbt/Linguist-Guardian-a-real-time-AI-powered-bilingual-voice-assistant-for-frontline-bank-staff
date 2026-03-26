@@ -176,10 +176,11 @@ async def _process_text_input(
 ) -> None:
     """
     Process a text message through the full pipeline:
-    1. GenAI (intent + translation)
-    2. Compliance check
-    3. Voice response
-    4. Persist to DB
+    1. Fetch session language (customer's preferred language)
+    2. GenAI (intent + translation via Sarvam AI)
+    3. Compliance check
+    4. Voice response in customer's language
+    5. Persist to DB
     """
     text = data.get("text", "")
     role = data.get("role", "customer")
@@ -188,8 +189,23 @@ async def _process_text_input(
     if not text:
         return
 
-    # Step 1: GenAI — intent detection + translation
-    genai_result = await genai_orchestrator.process_text(text)
+    # Fetch customer language from the session
+    customer_language = "hi"  # default fallback
+    async with async_session() as db:
+        session = await db.get(Session, session_id)
+        if session and session.language:
+            customer_language = session.language
+
+    # Determine target language based on role:
+    #   Staff speaks English → translate to customer's language
+    #   Customer speaks their language → translate to English for staff
+    if role == "staff":
+        target_lang = customer_language
+    else:
+        target_lang = "en"
+
+    # Step 1: GenAI — intent detection + translation via Sarvam AI
+    genai_result = await genai_orchestrator.process_text(text, target_language=target_lang)
 
     await manager.send_to_session(session_id, {
         "type": "translation",
@@ -212,10 +228,10 @@ async def _process_text_input(
             "data": compliance_result,
         })
 
-    # Step 3: Voice response
+    # Step 3: Voice response in customer's language
     response = await voice_response.generate_response(
         genai_result["intent"],
-        genai_result.get("target_language", "en"),
+        customer_language,
     )
 
     await manager.send_to_session(session_id, {
@@ -248,6 +264,7 @@ async def _process_text_input(
             db.add(alert)
 
         await db.commit()
+
 
 
 async def _handle_audio_chunk(

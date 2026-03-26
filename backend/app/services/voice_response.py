@@ -5,8 +5,9 @@ Generates text-based voice responses for the staff/customer.
 TTS is mocked — returns the response text along with a placeholder
 audio indicator.
 
-In a production system this would integrate with a real TTS engine
-(e.g. Google Cloud TTS, Azure TTS, or Coqui).
+Supports all 8 Indian languages + English. For Hindi and English,
+canned responses are used. For the other 6 languages, the English
+response is translated via Sarvam AI on the fly.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from __future__ import annotations
 from typing import Optional
 
 from app.core.logging import logger
+from app.services import sarvam_translate
 
 
 # ── Canned responses by intent (mock TTS) ─────────────────────
@@ -39,6 +41,9 @@ _RESPONSES_HI: dict[str, str] = {
     "general_query": "मुझे खुशी होगी मदद करने में। कृपया अपनी क्वेरी के बारे में और बताएं।",
 }
 
+# Languages that get real-time Sarvam AI translation from English
+_SARVAM_LANGUAGES = {"mr", "ta", "te", "bn", "gu", "kn", "ml"}
+
 
 async def generate_response(
     intent: str,
@@ -50,7 +55,7 @@ async def generate_response(
 
     Args:
         intent: Detected intent label.
-        language: Response language ('en' or 'hi').
+        language: Response language code ('en', 'hi', 'mr', 'ta', etc.).
         custom_text: Optional override text (skips canned responses).
 
     Returns:
@@ -60,6 +65,10 @@ async def generate_response(
         response_text = custom_text
     elif language == "hi":
         response_text = _RESPONSES_HI.get(intent, _RESPONSES_HI["general_query"])
+    elif language in _SARVAM_LANGUAGES:
+        # Translate English canned response to the target language via Sarvam AI
+        en_text = _RESPONSES_EN.get(intent, _RESPONSES_EN["general_query"])
+        response_text = await sarvam_translate.translate(en_text, "en", language)
     else:
         response_text = _RESPONSES_EN.get(intent, _RESPONSES_EN["general_query"])
 

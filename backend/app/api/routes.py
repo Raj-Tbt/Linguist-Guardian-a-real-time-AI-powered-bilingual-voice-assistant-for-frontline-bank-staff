@@ -91,6 +91,42 @@ async def list_sessions(db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
+@router.get("/sessions/active", response_model=List[SessionResponse], tags=["Sessions"])
+async def list_active_sessions(db: AsyncSession = Depends(get_db)):
+    """List active sessions that a customer can join."""
+    result = await db.execute(
+        select(Session)
+        .where(Session.status == "active")
+        .order_by(Session.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.post("/sessions/{session_id}/join", response_model=SessionResponse, tags=["Sessions"])
+async def join_session(
+    session_id: str,
+    payload: SessionCreate,
+    db: AsyncSession = Depends(get_db),
+):
+    """Customer joins an existing staff session."""
+    session = await db.get(Session, session_id)
+    if not session:
+        raise HTTPException(404, "Session not found")
+    if session.status != "active":
+        raise HTTPException(400, "Session is not active")
+
+    # Update session with customer info
+    if payload.customer_name:
+        session.customer_name = payload.customer_name
+    if payload.language:
+        session.language = payload.language
+
+    await db.flush()
+    await db.refresh(session)
+    logger.info("Customer joined session: %s (lang=%s)", session_id, payload.language)
+    return session
+
+
 @router.get("/sessions/{session_id}", response_model=SessionResponse, tags=["Sessions"])
 async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
     """Get a session by ID."""

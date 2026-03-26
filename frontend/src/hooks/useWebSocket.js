@@ -20,6 +20,12 @@ export default function useWebSocket(sessionId, onMessage) {
   const reconnectTimer = useRef(null);
   const reconnectDelay = useRef(1000);
 
+  // Store onMessage in a ref so connect() doesn't depend on its identity
+  const onMessageRef = useRef(onMessage);
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
+
   /** Establish the WebSocket connection. */
   const connect = useCallback(() => {
     if (!sessionId) return;
@@ -42,7 +48,7 @@ export default function useWebSocket(sessionId, onMessage) {
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        onMessage?.(message);
+        onMessageRef.current?.(message);
       } catch (err) {
         console.error('[WS] Failed to parse message:', err);
       }
@@ -70,7 +76,7 @@ export default function useWebSocket(sessionId, onMessage) {
     };
 
     wsRef.current = ws;
-  }, [sessionId, onMessage]);
+  }, [sessionId]);
 
   /** Disconnect and clean up. */
   const disconnect = useCallback(() => {

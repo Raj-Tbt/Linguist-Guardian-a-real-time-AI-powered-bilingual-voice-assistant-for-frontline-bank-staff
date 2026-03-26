@@ -38,6 +38,17 @@ export async function listSessions() {
   return request('/sessions');
 }
 
+export async function listActiveSessions() {
+  return request('/sessions/active');
+}
+
+export async function joinSession(sessionId, data) {
+  return request(`/sessions/${sessionId}/join`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 export async function getSession(sessionId) {
   return request(`/sessions/${sessionId}`);
 }

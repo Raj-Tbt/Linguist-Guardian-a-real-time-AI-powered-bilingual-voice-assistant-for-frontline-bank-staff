@@ -83,7 +83,8 @@ class TestFSMEngine:
 
 # ━━━━━━━━━━━━━━  GenAI Orchestrator Tests  ━━━━━━━━━━━━━━━━━
 
-from app.services.genai_orchestrator import process_text, _detect_language, _mock_detect_intent
+from app.services.genai_orchestrator import process_text, _mock_detect_intent
+from app.services.sarvam_translate import detect_language as _detect_language
 
 
 class TestGenAIOrchestrator:

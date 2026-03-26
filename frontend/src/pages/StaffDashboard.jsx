@@ -25,20 +25,19 @@ import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import useTextToSpeech from '../hooks/useTextToSpeech';
 import ChatPanel from '../components/ChatPanel';
 import ComplianceAlerts from '../components/ComplianceAlerts';
-import FSMTracker from '../components/FSMTracker';
+import IntentGuidance from '../components/IntentGuidance';
 import DocumentUpload from '../components/DocumentUpload';
 import SessionSummary from '../components/SessionSummary';
 import SentimentMeter from '../components/SentimentMeter';
-import { createSession, endSession, advanceFSM, getFSMState } from '../services/api';
+import { createSession, endSession } from '../services/api';
 
 export default function StaffDashboard() {
   // ── State ──────────────────────────────────────────────────
   const [sessionId, setSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [alerts, setAlerts] = useState([]);
-  const [fsmState, setFSMState] = useState({});
+  const [detectedIntents, setDetectedIntents] = useState([]);
   const [textInput, setTextInput] = useState('');
-  const [processType, setProcessType] = useState('account_opening');
   const [copiedId, setCopiedId] = useState(false);
   const [stressScore, setStressScore] = useState(0);
   const [deEscalate, setDeEscalate] = useState(false);
@@ -81,7 +80,20 @@ export default function StaffDashboard() {
         break;
 
       case 'fsm_update':
-        setFSMState(msg.data);
+        // Legacy — ignore
+        break;
+
+      case 'guidance_update':
+        // Dynamic intent detection — merge new intents into existing
+        if (msg.data.detected_intents) {
+          setDetectedIntents((prev) => {
+            const existingKeys = new Set(prev.map((i) => i.intent));
+            const newIntents = msg.data.detected_intents.filter(
+              (i) => !existingKeys.has(i.intent)
+            );
+            return [...prev, ...newIntents];
+          });
+        }
         break;
 
       case 'connected':
@@ -113,26 +125,21 @@ export default function StaffDashboard() {
   // ── Handlers ───────────────────────────────────────────────
   const handleCreateSession = async () => {
     try {
-      // Clear ALL previous session state (Fix #6)
+      // Clear ALL previous session state
       setMessages([]);
       setAlerts([]);
       setStressScore(0);
       setDeEscalate(false);
       setCurrentIntent(null);
-      setFSMState({});
+      setDetectedIntents([]);
       setTextInput('');
       setCopiedId(false);
 
       const session = await createSession({
         staff_name: 'Staff Agent',
         language: 'en',
-        process_type: processType,
       });
       setSessionId(session.id);
-
-      // Get initial FSM state
-      const fsm = await getFSMState(session.id);
-      setFSMState(fsm);
     } catch (err) {
       console.error('Failed to create session:', err);
     }
@@ -180,19 +187,9 @@ export default function StaffDashboard() {
     setStressScore(0);
     setDeEscalate(false);
     setCurrentIntent(null);
-    setFSMState({});
+    setDetectedIntents([]);
     setTextInput('');
     setCopiedId(false);
-  };
-
-  const handleAdvanceFSM = async (targetState) => {
-    if (!sessionId) return;
-    try {
-      const result = await advanceFSM(sessionId, targetState);
-      setFSMState(result);
-    } catch (err) {
-      console.error('FSM advance failed:', err);
-    }
   };
 
   const handleKeyDown = (e) => {
@@ -240,16 +237,8 @@ export default function StaffDashboard() {
             {/* Session controls */}
             {!sessionId ? (
               <div className="flex gap-2">
-                <select
-                  value={processType}
-                  onChange={(e) => setProcessType(e.target.value)}
-                  className="glass-input text-sm py-2 w-44"
-                >
-                  <option value="account_opening">🏦 Account Opening</option>
-                  <option value="loan_inquiry">💰 Loan Inquiry</option>
-                </select>
                 <button onClick={handleCreateSession} className="btn-primary text-sm">
-                  + New Session
+                  🚀 Start New Session
                 </button>
               </div>
             ) : (
@@ -377,14 +366,7 @@ export default function StaffDashboard() {
           <div className="space-y-4 overflow-y-auto">
             <SentimentMeter stressScore={stressScore} deEscalate={deEscalate} />
             <ComplianceAlerts alerts={alerts} />
-            <FSMTracker
-              processType={fsmState.process_type}
-              currentState={fsmState.current_state}
-              allSteps={fsmState.all_steps}
-              completedSteps={fsmState.completed_steps}
-              availableTransitions={fsmState.available_transitions}
-              onAdvance={handleAdvanceFSM}
-            />
+            <IntentGuidance detectedIntents={detectedIntents} />
             <DocumentUpload />
             <SessionSummary sessionId={sessionId} />
           </div>

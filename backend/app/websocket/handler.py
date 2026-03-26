@@ -35,6 +35,7 @@ from app.services import (
     compliance_engine,
     fsm_engine,
     genai_orchestrator,
+    intent_detector,
     queue_manager,
     sentiment_analyzer,
     speech_to_text,
@@ -231,33 +232,19 @@ async def _process_text_input(
         },
     })
 
-    # Step 3: Auto-start FSM process when customer intent maps to a banking process
+    # Step 3: Dynamic intent detection — detect banking intents from customer text
     if role == "customer":
-        intent = genai_result["intent"]
-        _INTENT_TO_PROCESS = {
-            "account_opening": "account_opening",
-            "loan_inquiry": "loan_application",
-            "loan_application": "loan_application",
-            "kyc_update": "kyc_update",
-        }
-        mapped_process = _INTENT_TO_PROCESS.get(intent)
-        if mapped_process and mapped_process in fsm_engine.PROCESSES:
-            async with async_session() as db:
-                session = await db.get(Session, session_id)
-                if session and session.process_type != mapped_process:
-                    initial_state = fsm_engine.start_process(mapped_process)
-                    session.process_type = mapped_process
-                    session.fsm_state = initial_state
-                    await db.commit()
+        # Use the English text for intent detection (either the original or translated)
+        english_text = genai_result["translated_text"] if target_lang == "en" else text
+        detected = intent_detector.detect_intents(english_text)
 
-                    info = fsm_engine.get_state_info(mapped_process, initial_state)
-                    await manager.send_to_session(session_id, {
-                        "type": "fsm_update",
-                        "data": {
-                            "process_type": mapped_process,
-                            **info,
-                        },
-                    })
+        if detected:
+            await manager.send_to_session(session_id, {
+                "type": "guidance_update",
+                "data": {
+                    "detected_intents": detected,
+                },
+            })
 
     # Step 4: Compliance check (runs for all messages)
     compliance_result = await compliance_engine.check_compliance(text)

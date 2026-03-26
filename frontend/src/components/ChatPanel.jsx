@@ -1,9 +1,10 @@
 /**
- * ChatPanel — Bilingual chat display with message role indicators.
+ * ChatPanel — Bilingual chat display with TTS support.
  *
  * Renders a scrollable list of messages with:
  *   • Role badges (Customer / Staff / System)
  *   • Original text + translated text
+ *   • 🔊 Speak buttons for TTS playback
  *   • Intent tags
  *   • Timestamps
  *   • Auto-scroll to latest message
@@ -35,7 +36,23 @@ const ROLE_STYLES = {
   },
 };
 
-export default function ChatPanel({ messages = [] }) {
+/**
+ * @param {object} props
+ * @param {Array} props.messages - Chat messages
+ * @param {Function} [props.onSpeak] - TTS callback: onSpeak(text, language)
+ * @param {boolean} [props.isSpeaking] - Whether TTS is currently speaking
+ * @param {Function} [props.onStopSpeaking] - Stop TTS callback
+ * @param {string} [props.speakLanguage] - Language for TTS output
+ * @param {string} [props.dashboardRole] - 'staff' or 'customer' — which dashboard this is on
+ */
+export default function ChatPanel({
+  messages = [],
+  onSpeak,
+  isSpeaking,
+  onStopSpeaking,
+  speakLanguage,
+  dashboardRole = 'staff',
+}) {
   const bottomRef = useRef(null);
 
   // Auto-scroll to bottom when new messages arrive
@@ -63,19 +80,63 @@ export default function ChatPanel({ messages = [] }) {
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
         {messages.map((msg, idx) => {
           const style = ROLE_STYLES[msg.role] || ROLE_STYLES.system;
+
+          // Pick the correct text for TTS based on who sent the message
+          // and which dashboard we are on:
+          //
+          // Staff Dashboard (speakLanguage='en', dashboardRole='staff'):
+          //   - Staff msg:    original_text is English    → speak original_text in 'en'
+          //   - Customer msg: original_text is Hindi/etc  → speak translated_text in 'en'
+          //
+          // Customer Dashboard (speakLanguage='hi', dashboardRole='customer'):
+          //   - Customer msg: original_text is Hindi      → speak original_text in 'hi'
+          //   - Staff msg:    original_text is Hindi (swapped) → speak original_text in 'hi'
+          let speakableText;
+          let msgSpeakLang = speakLanguage;
+
+          if (dashboardRole === 'staff' && msg.role === 'customer') {
+            // Staff reading a customer message → speak the English translation
+            speakableText = msg.translated_text || msg.original_text || msg.text;
+            msgSpeakLang = 'en';
+          } else {
+            // All other cases → speak the primary display text (original_text)
+            speakableText = msg.original_text || msg.text || msg.translated_text;
+          }
+
           return (
             <div
               key={msg.id || idx}
               className={`animate-slide-up max-w-[85%] ${style.align}`}
             >
               <div className={`${style.bg} border ${style.border} rounded-xl p-3`}>
-                {/* Header: role + intent */}
+                {/* Header: role + intent + speak button */}
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className={style.badge}>{style.label}</span>
                   {msg.intent && msg.intent !== 'general_query' && (
                     <span className="badge bg-purple-500/20 text-purple-400 border border-purple-500/30">
                       {msg.intent.replace(/_/g, ' ')}
                     </span>
+                  )}
+
+                  {/* TTS Speak / Stop button */}
+                  {onSpeak && speakableText && msg.role !== 'system' && (
+                    <button
+                      onClick={() => {
+                        if (isSpeaking) {
+                          onStopSpeaking?.();
+                        } else {
+                          onSpeak(speakableText, msgSpeakLang);
+                        }
+                      }}
+                      className={`ml-auto p-1 rounded-md text-xs transition-all ${
+                        isSpeaking
+                          ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                          : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-indigo-400'
+                      }`}
+                      title={isSpeaking ? 'Stop speaking' : 'Listen to this message'}
+                    >
+                      {isSpeaking ? '⏹' : '🔊'}
+                    </button>
                   )}
                 </div>
 

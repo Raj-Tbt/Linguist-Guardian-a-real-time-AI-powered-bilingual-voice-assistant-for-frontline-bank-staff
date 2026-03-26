@@ -16,7 +16,8 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,11 +47,13 @@ from app.schemas.schemas import (
 )
 from app.services import (
     compliance_engine,
+    document_ocr,
     document_verification,
     fsm_engine,
     genai_orchestrator,
     queue_manager,
     summary_service,
+    tts_service,
     voice_response,
 )
 
@@ -302,7 +305,75 @@ async def verify_document(
     return await document_verification.verify_document(payload, db)
 
 
-# ━━━━━━━━━━━━━━━━━━━━━  FSM  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@router.post("/verify-document-upload", tags=["Documents"])
+async def verify_document_upload(
+    file: UploadFile = File(...),
+    document_type: str = Form("aadhaar"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Upload an identity document image for AI-powered verification.
+
+    1. AI Vision extracts name, number, DOB from the image
+    2. Extracted data is matched against the fake-user database
+       using Jaro-Winkler + Levenshtein similarity
+    3. Returns extracted data, per-field match results, and verdict
+    """
+    # Validate file type
+    allowed = {"image/jpeg", "image/png", "image/webp", "image/jpg"}
+    if file.content_type and file.content_type not in allowed:
+        raise HTTPException(400, f"Unsupported file type: {file.content_type}. Use JPEG, PNG, or WebP.")
+
+    image_bytes = await file.read()
+
+    # Step 1: AI OCR extraction
+    extraction = await document_ocr.extract_document_data(
+        image_bytes,
+        filename=file.filename or "document.jpg",
+        document_type=document_type,
+    )
+
+    if "error" in extraction:
+        return {
+            "extraction": extraction,
+            "verification": None,
+            "status": "rejected",
+            "message": extraction["error"],
+        }
+
+    # Step 2: Feed extracted data into verification pipeline
+    verify_request = DocumentVerifyRequest(
+        document_type=extraction.get("document_type", document_type),
+        extracted_name=extraction.get("extracted_name", ""),
+        extracted_number=extraction.get("extracted_number", ""),
+        extracted_dob=extraction.get("extracted_dob", ""),
+    )
+
+    verification = await document_verification.verify_document(verify_request, db)
+
+    # Step 3: Determine overall status
+    if not verification.user_found:
+        status = "not_found"
+    elif verification.verified:
+        status = "verified"
+    else:
+        # Check if partial match (some fields match)
+        matching = sum(1 for r in verification.results if r.match)
+        total = len(verification.results)
+        if matching > 0:
+            status = "needs_review"
+        else:
+            status = "not_verified"
+
+    return {
+        "extraction": extraction,
+        "verification": {
+            "verified": verification.verified,
+            "user_found": verification.user_found,
+            "results": [r.model_dump() for r in verification.results],
+        },
+        "status": status,
+    }
 
 @router.get(
     "/sessions/{session_id}/fsm-state",
@@ -373,6 +444,45 @@ async def advance_fsm(
         available_transitions=info["available_transitions"],
         completed_steps=info["completed_steps"],
         all_steps=info["all_steps"],
+    )
+
+
+# ━━━━━━━━━━━━━━━━━━━  Text-to-Speech  ━━━━━━━━━━━━━━━━━━━━━━
+
+class TTSRequest(BaseModel):
+    text: str
+    language: str = "hi"
+
+@router.post("/tts", tags=["TTS"])
+async def synthesize_speech(payload: TTSRequest):
+    """
+    Convert text to speech using Sarvam AI TTS.
+
+    Returns WAV audio as a streaming response.
+    For English, the frontend uses browser SpeechSynthesis instead.
+    """
+    from fastapi.responses import Response
+
+    if payload.language == "en":
+        # English handled by browser SpeechSynthesis — no API call needed
+        return Response(
+            content='{"use_browser": true}',
+            media_type="application/json",
+            status_code=200,
+        )
+
+    audio_bytes = await tts_service.text_to_speech(
+        text=payload.text,
+        language=payload.language,
+    )
+
+    if audio_bytes is None:
+        raise HTTPException(503, "TTS service unavailable. Check Sarvam AI API key.")
+
+    return Response(
+        content=audio_bytes,
+        media_type="audio/wav",
+        headers={"Content-Disposition": "inline"},
     )
 
 

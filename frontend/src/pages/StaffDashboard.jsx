@@ -22,6 +22,7 @@
 import { useState, useCallback } from 'react';
 import useWebSocket from '../hooks/useWebSocket';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
+import useTextToSpeech from '../hooks/useTextToSpeech';
 import ChatPanel from '../components/ChatPanel';
 import ComplianceAlerts from '../components/ComplianceAlerts';
 import FSMTracker from '../components/FSMTracker';
@@ -105,6 +106,9 @@ export default function StaffDashboard() {
     handleSpeechResult,
     'en',
   );
+
+  // Text-to-speech — staff hears customer messages in English
+  const { speak, stop: stopSpeaking, isSpeaking } = useTextToSpeech('en');
 
   // ── Handlers ───────────────────────────────────────────────
   const handleCreateSession = async () => {
@@ -310,7 +314,14 @@ export default function StaffDashboard() {
           {/* Left column — Chat */}
           <div className="lg:col-span-2 flex flex-col gap-4">
             <div className="flex-1 min-h-0">
-              <ChatPanel messages={messages} />
+              <ChatPanel
+                messages={messages}
+                onSpeak={speak}
+                isSpeaking={isSpeaking}
+                onStopSpeaking={stopSpeaking}
+                speakLanguage="en"
+                dashboardRole="staff"
+              />
             </div>
 
             {/* Input area */}

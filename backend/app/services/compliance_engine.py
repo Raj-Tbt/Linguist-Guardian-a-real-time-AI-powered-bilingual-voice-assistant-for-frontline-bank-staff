@@ -1,261 +1,188 @@
 """
-Linguist-Guardian — Compliance Engine.
+Linguist-Guardian — Context-Aware Compliance Engine.
 
-Two detection strategies run in parallel:
-  1. **BM25 keyword matching** — scans text against a corpus of
-     known compliance-violation phrases using Okapi BM25.
-  2. **Semantic similarity** — encodes text with SentenceTransformers,
-     compares against a ChromaDB collection of policy-violation
-     embeddings.
+Monitors staff communication for RBI compliance violations using:
+  1. Configurable keyword database (compliance_keywords.json)
+  2. Context-aware negation detection — suppresses alerts when trigger
+     phrases appear inside a negation context (e.g. "NOT guaranteed returns")
+  3. Risk-based classification: high / medium / low
 
-If either strategy exceeds its threshold, an alert is emitted.
+Negation Detection:
+  Scans a window of up to 5 words BEFORE each trigger phrase for
+  negation tokens like "not", "no", "never", "don't", "doesn't",
+  "won't", "isn't", "aren't", "cannot", "can't", "without", "neither".
+  If a negation is found, the alert is suppressed.
+
+Configuration:
+  All keywords are stored in compliance_keywords.json.
+  Update that file to add/remove phrases — no code changes needed.
 """
 
 from __future__ import annotations
 
-import uuid
-from typing import List, Dict, Optional
-
-import numpy as np
-from rank_bm25 import BM25Okapi
+import json
+import os
+import re
+from typing import List, Dict
 
 from app.core.logging import logger
 
-# ── Violation corpus (keyword-based) ─────────────────────────
-# Each entry is a known non-compliant phrase or statement.
-VIOLATION_PHRASES: List[str] = [
-    "guaranteed returns on investment",
-    "no risk involved in this scheme",
-    "you will definitely get approved",
-    "we can bypass the verification process",
-    "no need for documentation",
-    "skip the KYC process",
-    "hide this from the regulators",
-    "unofficial fee for faster processing",
-    "personal guarantee from the bank manager",
-    "assured profit on this product",
-    "we can manipulate your credit score",
-    "don't worry about the terms and conditions",
-    "just sign here without reading",
-    "we can waive all charges unofficially",
-    "this information stays between us",
-    "I can approve this without proper verification",
-    "no need to declare your existing loans",
-    "we can adjust the numbers",
-    "forget about the compliance requirements",
-    "this is a special deal just for you off the record",
-]
-
-# Tokenised violation corpus for BM25
-_TOKENIZED_CORPUS = [phrase.lower().split() for phrase in VIOLATION_PHRASES]
-_BM25_INDEX = BM25Okapi(_TOKENIZED_CORPUS)
-
-# ── Semantic violation descriptions (for vector search) ──────
-SEMANTIC_VIOLATIONS: List[Dict[str, str]] = [
-    {"id": "sv01", "text": "Promising guaranteed or assured returns", "severity": "critical"},
-    {"id": "sv02", "text": "Suggesting to bypass or skip KYC verification", "severity": "critical"},
-    {"id": "sv03", "text": "Offering to manipulate documents or data", "severity": "critical"},
-    {"id": "sv04", "text": "Asking customer to sign without reading terms", "severity": "warning"},
-    {"id": "sv05", "text": "Requesting unofficial or hidden fees", "severity": "critical"},
-    {"id": "sv06", "text": "Promising loan approval without proper checks", "severity": "warning"},
-    {"id": "sv07", "text": "Suggesting to hide information from regulators", "severity": "critical"},
-    {"id": "sv08", "text": "Misrepresenting product risk level", "severity": "warning"},
-    {"id": "sv09", "text": "Pressure selling without proper disclosure", "severity": "warning"},
-    {"id": "sv10", "text": "Offering special treatment off the record", "severity": "warning"},
-]
-
-# ── Thresholds ────────────────────────────────────────────────
-BM25_THRESHOLD = 8.0       # BM25 score above which we flag
-SEMANTIC_THRESHOLD = 0.55   # cosine similarity above which we flag
-
-# ── ChromaDB + SentenceTransformer (lazy-loaded singletons) ──
-_chroma_collection = None
-_sentence_model = None
+# ── Load keyword database ─────────────────────────────────────
+_KEYWORDS_PATH = os.path.join(os.path.dirname(__file__), "compliance_keywords.json")
 
 
-def _get_sentence_model():
-    """Lazy-load the SentenceTransformer model (all-MiniLM-L6-v2)."""
-    global _sentence_model
-    if _sentence_model is None:
-        try:
-            from sentence_transformers import SentenceTransformer
-            _sentence_model = SentenceTransformer("all-MiniLM-L6-v2")
-            logger.info("SentenceTransformer loaded for compliance engine.")
-        except Exception as exc:
-            logger.warning("SentenceTransformer unavailable: %s — semantic checks disabled.", exc)
-    return _sentence_model
-
-
-def _get_chroma_collection():
-    """
-    Lazy-load / create the ChromaDB collection of violation embeddings.
-    """
-    global _chroma_collection
-    if _chroma_collection is not None:
-        return _chroma_collection
-
-    model = _get_sentence_model()
-    if model is None:
-        return None
-
+def _load_keywords() -> dict:
+    """Load the compliance keywords JSON file."""
     try:
-        import chromadb
-
-        client = chromadb.Client()  # in-memory
-
-        # Delete if exists (idempotent re-init)
-        try:
-            client.delete_collection("compliance_violations")
-        except Exception:
-            pass
-
-        collection = client.create_collection(
-            name="compliance_violations",
-            metadata={"hnsw:space": "cosine"},
-        )
-
-        # Embed and insert all semantic violation descriptions
-        texts = [v["text"] for v in SEMANTIC_VIOLATIONS]
-        embeddings = model.encode(texts).tolist()
-
-        collection.add(
-            ids=[v["id"] for v in SEMANTIC_VIOLATIONS],
-            embeddings=embeddings,
-            documents=texts,
-            metadatas=[{"severity": v["severity"]} for v in SEMANTIC_VIOLATIONS],
-        )
-
-        _chroma_collection = collection
-        logger.info("ChromaDB compliance collection initialised with %d entries.", len(texts))
-        return collection
-
+        with open(_KEYWORDS_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
     except Exception as exc:
-        logger.warning("ChromaDB init failed: %s — semantic checks disabled.", exc)
-        return None
+        logger.error("Failed to load compliance keywords: %s", exc)
+        return {"keywords": [], "categories": {}}
 
 
-# ━━━━━━━━━━━━━━━━  BM25 Check  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+_CONFIG = _load_keywords()
+_KEYWORDS: List[dict] = _CONFIG.get("keywords", [])
+_CATEGORIES: Dict[str, str] = _CONFIG.get("categories", {})
 
-def check_bm25(text: str) -> List[Dict]:
+# ── Negation tokens ───────────────────────────────────────────
+NEGATION_TOKENS = {
+    "not", "no", "never", "neither", "nor",
+    "don't", "dont", "doesn't", "doesnt",
+    "didn't", "didnt", "won't", "wont",
+    "wouldn't", "wouldnt", "shouldn't", "shouldnt",
+    "can't", "cant", "cannot", "couldn't", "couldnt",
+    "isn't", "isnt", "aren't", "arent",
+    "wasn't", "wasnt", "weren't", "werent",
+    "hasn't", "hasnt", "haven't", "havent",
+    "without", "deny", "denies", "denied",
+    "refuse", "refuses", "refused",
+    "prevent", "prevents", "prohibited",
+}
+
+# How many words before the trigger phrase to scan for negation
+NEGATION_WINDOW = 5
+
+# ── Risk level mapping ────────────────────────────────────────
+RISK_LABELS = {
+    "high": "🔴 High Risk",
+    "medium": "🟡 Medium Risk",
+    "low": "🟢 Low Risk",
+}
+
+RISK_SEVERITY = {
+    "high": "critical",
+    "medium": "warning",
+    "low": "info",
+}
+
+
+def _is_negated(text_lower: str, phrase: str) -> bool:
     """
-    Run BM25 keyword matching against the violation corpus.
+    Check if a trigger phrase is preceded by a negation word
+    within a window of NEGATION_WINDOW words.
 
-    Args:
-        text: Input text to check.
+    Example:
+      "this is NOT a guaranteed return"
+        → phrase = "guaranteed return"
+        → words before: ["this", "is", "not", "a"]
+        → "not" found in negation tokens → True (negated)
 
-    Returns:
-        List of alert dicts with type, severity, description, score.
+      "this gives guaranteed returns"
+        → words before: ["this", "gives"]
+        → no negation token → False (not negated)
     """
-    tokenized_query = text.lower().split()
-    scores = _BM25_INDEX.get_scores(tokenized_query)
+    # Find where the phrase starts in the text
+    phrase_pos = text_lower.find(phrase)
+    if phrase_pos < 0:
+        return False
 
-    alerts: List[Dict] = []
-    for idx, score in enumerate(scores):
-        if score >= BM25_THRESHOLD:
-            alerts.append({
-                "alert_type": "keyword",
-                "severity": "warning",
-                "description": f"Potential compliance violation detected: '{VIOLATION_PHRASES[idx]}'",
-                "matched_text": VIOLATION_PHRASES[idx],
-                "confidence": round(float(score / (score + BM25_THRESHOLD)), 3),
-            })
+    # Get the text before the phrase
+    prefix = text_lower[:phrase_pos].strip()
+    if not prefix:
+        return False
 
-    if alerts:
-        logger.warning("BM25 flagged %d potential violations.", len(alerts))
+    # Tokenize and look at the last N words
+    words = re.findall(r"[a-z']+", prefix)
+    window = words[-NEGATION_WINDOW:] if len(words) > NEGATION_WINDOW else words
 
-    return alerts
+    for word in window:
+        if word in NEGATION_TOKENS:
+            return True
 
+    return False
 
-# ━━━━━━━━━━━━━━  Semantic Check  ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-def check_semantic(text: str) -> List[Dict]:
-    """
-    Run semantic similarity check against the violation collection.
-
-    Args:
-        text: Input text to check.
-
-    Returns:
-        List of alert dicts.
-    """
-    model = _get_sentence_model()
-    collection = _get_chroma_collection()
-
-    if model is None or collection is None:
-        return []  # gracefully degrade
-
-    try:
-        query_embedding = model.encode([text]).tolist()
-
-        results = collection.query(
-            query_embeddings=query_embedding,
-            n_results=3,
-        )
-
-        alerts: List[Dict] = []
-        if results and results["distances"]:
-            for i, distance in enumerate(results["distances"][0]):
-                # ChromaDB cosine distance: 0 = identical, 2 = opposite
-                similarity = 1.0 - (distance / 2.0)
-                if similarity >= SEMANTIC_THRESHOLD:
-                    doc_text = results["documents"][0][i] if results["documents"] else ""
-                    severity = (
-                        results["metadatas"][0][i].get("severity", "warning")
-                        if results["metadatas"]
-                        else "warning"
-                    )
-                    alerts.append({
-                        "alert_type": "semantic",
-                        "severity": severity,
-                        "description": f"Semantic match: {doc_text}",
-                        "matched_text": doc_text,
-                        "confidence": round(similarity, 3),
-                    })
-
-        if alerts:
-            logger.warning("Semantic check flagged %d potential violations.", len(alerts))
-
-        return alerts
-
-    except Exception as exc:
-        logger.error("Semantic check failed: %s", exc)
-        return []
-
-
-# ━━━━━━━━━━━━━━  Combined Check  ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 async def check_compliance(text: str) -> Dict:
     """
-    Run both BM25 and semantic compliance checks.
+    Check text for RBI compliance violations with negation awareness.
+
+    Only triggers alerts when:
+      1. A predefined trigger phrase is found in the text, AND
+      2. It is NOT preceded by a negation word
 
     Args:
-        text: Text to analyse.
+        text: Text to analyse (staff communication).
 
     Returns:
-        dict with keys: is_compliant (bool), alerts (list).
+        dict with keys:
+          is_compliant (bool),
+          alerts (list of alert dicts with alert_type, severity,
+                  risk, risk_label, category, description,
+                  matched_text, confidence, timestamp)
     """
-    bm25_alerts = check_bm25(text)
-    semantic_alerts = check_semantic(text)
+    if not text or not text.strip():
+        return {"is_compliant": True, "alerts": []}
 
-    all_alerts = bm25_alerts + semantic_alerts
+    text_lower = text.lower().strip()
+    alerts: List[Dict] = []
+    seen_phrases = set()
 
-    # Deduplicate by matched_text
-    seen = set()
-    unique_alerts: List[Dict] = []
-    for alert in all_alerts:
-        key = alert.get("matched_text", "")
-        if key not in seen:
-            seen.add(key)
-            unique_alerts.append(alert)
+    for entry in _KEYWORDS:
+        phrase = entry["phrase"]
+        risk = entry.get("risk", "medium")
+        category_key = entry.get("category", "unknown")
 
-    is_compliant = len(unique_alerts) == 0
+        if phrase not in text_lower:
+            continue
 
-    logger.info(
-        "Compliance check: compliant=%s alerts=%d",
-        is_compliant, len(unique_alerts),
-    )
+        if phrase in seen_phrases:
+            continue
+
+        # ── Negation check ────────────────────────────────────
+        if _is_negated(text_lower, phrase):
+            logger.debug(
+                "Compliance: '%s' negated in context — alert suppressed.",
+                phrase,
+            )
+            continue
+
+        seen_phrases.add(phrase)
+        category_label = _CATEGORIES.get(category_key, category_key)
+
+        alerts.append({
+            "alert_type": category_key,
+            "category": category_label,
+            "severity": RISK_SEVERITY.get(risk, "warning"),
+            "risk": risk,
+            "risk_label": RISK_LABELS.get(risk, "🟡 Medium Risk"),
+            "description": f"[{category_label}] Detected: \"{phrase}\"",
+            "matched_text": phrase,
+            "confidence": 1.0,
+        })
+
+    is_compliant = len(alerts) == 0
+
+    if not is_compliant:
+        logger.warning(
+            "Compliance violation: %d alert(s) in: '%s'",
+            len(alerts),
+            text[:100],
+        )
+    else:
+        logger.debug("Compliance check passed: '%s'", text[:50])
 
     return {
         "is_compliant": is_compliant,
-        "alerts": unique_alerts,
+        "alerts": alerts,
     }

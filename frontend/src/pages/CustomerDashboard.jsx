@@ -13,6 +13,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import useWebSocket from '../hooks/useWebSocket';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
+import useTextToSpeech from '../hooks/useTextToSpeech';
 import ChatPanel from '../components/ChatPanel';
 import { listActiveSessions, joinSession } from '../services/api';
 
@@ -124,6 +125,9 @@ export default function CustomerDashboard() {
     handleSpeechResult,
     language,
   );
+
+  // Text-to-speech — listen to staff responses in customer's language
+  const { speak, stop: stopSpeaking, isSpeaking } = useTextToSpeech(language);
 
   // ── Handlers ───────────────────────────────────────────────
   const handleJoinSession = async (sid) => {
@@ -317,7 +321,14 @@ export default function CustomerDashboard() {
           </div>
 
           <div className="flex-1 min-h-0 mb-4">
-            <ChatPanel messages={messages} />
+            <ChatPanel
+              messages={messages}
+              onSpeak={speak}
+              isSpeaking={isSpeaking}
+              onStopSpeaking={stopSpeaking}
+              speakLanguage={language}
+              dashboardRole="customer"
+            />
           </div>
 
           {/* Input area */}

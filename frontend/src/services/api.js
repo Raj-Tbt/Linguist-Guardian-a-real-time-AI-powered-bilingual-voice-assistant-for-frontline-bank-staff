@@ -92,6 +92,26 @@ export async function verifyDocument(data) {
   });
 }
 
+export async function verifyDocumentUpload(file, documentType = 'aadhaar') {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('document_type', documentType);
+
+  const url = `${BASE_URL}/verify-document-upload`;
+  const res = await fetch(url, {
+    method: 'POST',
+    body: formData,
+    // Don't set Content-Type — browser sets multipart boundary automatically
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(error.detail || `Upload failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
 // ── FSM ──────────────────────────────────────────────────────
 
 export async function getFSMState(sessionId) {

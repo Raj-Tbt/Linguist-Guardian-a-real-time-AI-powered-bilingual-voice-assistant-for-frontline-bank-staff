@@ -5,21 +5,23 @@ Manages real-time audio streaming sessions:
   1. Client connects with a session ID
   2. Client sends audio chunks (binary) or JSON control messages
   3. Server processes through the pipeline:
-       Audio → STT → GenAI → Compliance → FSM update
+       Audio → STT + Sentiment → GenAI → Compliance → FSM update
   4. Server streams results back as JSON messages
 
 Message types (server → client):
   • transcription  — STT result
   • translation    — GenAI intent + translation
   • compliance     — compliance check result
+  • sentiment      — stress score + de-escalation flag
   • fsm_update     — current FSM state
-  • voice_response — text response (TTS mock)
+  • voice_response — text response (emotion-adaptive)
   • error          — error message
   • connected      — connection confirmation
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Optional
 
@@ -33,6 +35,8 @@ from app.services import (
     compliance_engine,
     fsm_engine,
     genai_orchestrator,
+    queue_manager,
+    sentiment_analyzer,
     speech_to_text,
     voice_response,
 )
@@ -175,12 +179,15 @@ async def _process_text_input(
     data: dict,
 ) -> None:
     """
-    Process a text message through the full pipeline:
-    1. Fetch session language (customer's preferred language)
-    2. GenAI (intent + translation via Sarvam AI)
-    3. Compliance check
-    4. Voice response in customer's language
-    5. Persist to DB
+    Process a text message through the correct bidirectional workflow:
+
+    CUSTOMER sends → translate to English → show on STAFF dashboard
+      (staff sees the question, reads it, and manually types a reply)
+
+    STAFF sends → translate to customer's language → show on CUSTOMER dashboard
+      (customer sees the staff's reply in their own language)
+
+    Both paths also run: compliance check, intent detection, queue update.
     """
     text = data.get("text", "")
     role = data.get("role", "customer")
@@ -207,9 +214,14 @@ async def _process_text_input(
     # Step 1: GenAI — intent detection + translation via Sarvam AI
     genai_result = await genai_orchestrator.process_text(text, target_language=target_lang)
 
+    # Step 2: Send the message to BOTH dashboards with role included
+    # Each dashboard will know:
+    #   - If role matches their own → it's an echo of their sent message (skip)
+    #   - If role differs → it's an incoming message from the other party (display)
     await manager.send_to_session(session_id, {
-        "type": "translation",
+        "type": "message",
         "data": {
+            "role": role,
             "original_text": text,
             "translated_text": genai_result["translated_text"],
             "intent": genai_result["intent"],
@@ -219,7 +231,35 @@ async def _process_text_input(
         },
     })
 
-    # Step 2: Compliance check
+    # Step 3: Auto-start FSM process when customer intent maps to a banking process
+    if role == "customer":
+        intent = genai_result["intent"]
+        _INTENT_TO_PROCESS = {
+            "account_opening": "account_opening",
+            "loan_inquiry": "loan_application",
+            "loan_application": "loan_application",
+            "kyc_update": "kyc_update",
+        }
+        mapped_process = _INTENT_TO_PROCESS.get(intent)
+        if mapped_process and mapped_process in fsm_engine.PROCESSES:
+            async with async_session() as db:
+                session = await db.get(Session, session_id)
+                if session and session.process_type != mapped_process:
+                    initial_state = fsm_engine.start_process(mapped_process)
+                    session.process_type = mapped_process
+                    session.fsm_state = initial_state
+                    await db.commit()
+
+                    info = fsm_engine.get_state_info(mapped_process, initial_state)
+                    await manager.send_to_session(session_id, {
+                        "type": "fsm_update",
+                        "data": {
+                            "process_type": mapped_process,
+                            **info,
+                        },
+                    })
+
+    # Step 4: Compliance check (runs for all messages)
     compliance_result = await compliance_engine.check_compliance(text)
 
     if not compliance_result["is_compliant"]:
@@ -228,18 +268,13 @@ async def _process_text_input(
             "data": compliance_result,
         })
 
-    # Step 3: Voice response in customer's language
-    response = await voice_response.generate_response(
-        genai_result["intent"],
-        customer_language,
+    # Step 5: Update urgency queue with latest intent
+    queue_manager.enqueue(
+        session_id=session_id,
+        intent=genai_result["intent"],
     )
 
-    await manager.send_to_session(session_id, {
-        "type": "voice_response",
-        "data": response,
-    })
-
-    # Step 4: Persist message to DB
+    # Step 5: Persist message to DB
     async with async_session() as db:
         message = Message(
             session_id=session_id,
@@ -273,16 +308,39 @@ async def _handle_audio_chunk(
     audio_bytes: bytes,
 ) -> None:
     """
-    Process an audio chunk:
-    1. STT (Whisper) → transcription
-    2. Feed transcription into the text pipeline
+    Process a complete audio recording:
+    1. Fetch customer's language from session DB
+    2. STT (Whisper/Sarvam) + Sentiment (MFCC/YIN) in parallel
+    3. Send transcription to customer dashboard
+    4. Feed transcription into text pipeline for translation + routing
     """
     if not audio_bytes or len(audio_bytes) < 100:
         return  # Skip tiny fragments
 
-    # Step 1: Speech-to-text
-    stt_result = await speech_to_text.transcribe_audio(audio_bytes)
+    # Fetch customer language from session (Fix #2 + #5)
+    customer_language = "hi"
+    async with async_session() as db:
+        session = await db.get(Session, session_id)
+        if session and session.language:
+            customer_language = session.language
 
+    # Step 1 + 2: Run STT and sentiment analysis in PARALLEL
+    stt_task = asyncio.create_task(
+        speech_to_text.transcribe_audio(audio_bytes, language=customer_language)
+    )
+    sentiment_task = asyncio.create_task(
+        sentiment_analyzer.analyse_audio(audio_bytes)
+    )
+
+    stt_result, sentiment_result = await asyncio.gather(
+        stt_task, sentiment_task
+    )
+
+    # Skip empty transcriptions
+    if not stt_result.get("text", "").strip():
+        return
+
+    # Send transcription to customer dashboard (shows what mic captured)
     await manager.send_to_session(session_id, {
         "type": "transcription",
         "data": {
@@ -292,7 +350,25 @@ async def _handle_audio_chunk(
         },
     })
 
-    # Step 2: Feed transcription through the text pipeline
+    # Send sentiment to staff dashboard
+    await manager.send_to_session(session_id, {
+        "type": "sentiment",
+        "data": {
+            "stress_score": sentiment_result["stress_score"],
+            "de_escalate": sentiment_result["de_escalate"],
+            "pitch_mean": sentiment_result["pitch_mean"],
+            "pitch_std": sentiment_result["pitch_std"],
+        },
+    })
+
+    # Update urgency queue with stress
+    queue_manager.enqueue(
+        session_id=session_id,
+        stress_score=sentiment_result["stress_score"],
+    )
+
+    # Step 3: Feed transcription through the text pipeline
+    # (translates to English + shows on staff dashboard)
     await _process_text_input(websocket, session_id, {
         "text": stt_result["text"],
         "role": "customer",

@@ -49,6 +49,7 @@ from app.services import (
     document_verification,
     fsm_engine,
     genai_orchestrator,
+    queue_manager,
     summary_service,
     voice_response,
 )
@@ -63,7 +64,15 @@ async def create_session(
     payload: SessionCreate,
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new interaction session."""
+    """Create a new interaction session. Auto-closes old active sessions."""
+    # Auto-close ALL previous active sessions (single session view)
+    old_sessions = await db.execute(
+        select(Session).where(Session.status == "active")
+    )
+    for old in old_sessions.scalars().all():
+        old.status = "completed"
+    await db.flush()
+
     session = Session(
         customer_name=payload.customer_name,
         staff_name=payload.staff_name,
@@ -78,7 +87,7 @@ async def create_session(
     db.add(session)
     await db.flush()
     await db.refresh(session)
-    logger.info("Session created: %s", session.id)
+    logger.info("Session created: %s (old sessions closed)", session.id)
     return session
 
 
@@ -133,6 +142,22 @@ async def get_session(session_id: str, db: AsyncSession = Depends(get_db)):
     session = await db.get(Session, session_id)
     if not session:
         raise HTTPException(404, "Session not found")
+    return session
+
+
+@router.post("/sessions/{session_id}/end", response_model=SessionResponse, tags=["Sessions"])
+async def end_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """End a session — marks it as completed."""
+    session = await db.get(Session, session_id)
+    if not session:
+        raise HTTPException(404, "Session not found")
+    session.status = "completed"
+    await db.flush()
+    await db.refresh(session)
+    logger.info("Session ended: %s", session_id)
     return session
 
 
@@ -441,3 +466,26 @@ async def list_fake_users(db: AsyncSession = Depends(get_db)):
         }
         for u in users
     ]
+
+
+# ━━━━━━━━━━━━━━━  Queue Management  ━━━━━━━━━━━━━━━━━━━━━━━━
+
+@router.get("/queue", tags=["Queue"])
+async def get_queue():
+    """
+    Get the current branch priority queue.
+
+    Returns customers sorted by urgency (most urgent first).
+    Each entry includes: session_id, customer_name, intent,
+    stress_score, urgency, wait_minutes, doc_pending.
+    """
+    return {
+        "queue": queue_manager.get_queue_state(),
+        "size": queue_manager.get_queue_size(),
+    }
+
+
+@router.get("/queue/size", tags=["Queue"])
+async def get_queue_size():
+    """Get the number of customers in the queue."""
+    return {"size": queue_manager.get_queue_size()}

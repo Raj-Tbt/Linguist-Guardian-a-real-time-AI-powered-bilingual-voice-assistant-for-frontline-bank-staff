@@ -2,7 +2,7 @@
 Linguist-Guardian — FastAPI Application Entry Point.
 
 Sets up:
-  • CORS middleware
+  • CORS middleware (custom, WebSocket-friendly)
   • Lifespan (DB init + seeding on startup)
   • REST router mounting
   • WebSocket endpoint
@@ -13,8 +13,10 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, WebSocket
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -53,14 +55,36 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── CORS ──────────────────────────────────────────────────────
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
+# ── CORS (custom middleware — allows WebSocket connections) ───
+class CORSMiddlewareHTTPOnly(BaseHTTPMiddleware):
+    """
+    Custom CORS middleware that applies CORS headers to HTTP
+    requests only. WebSocket upgrade requests bypass CORS entirely
+    so they are never blocked by origin checks.
+
+    Starlette 1.0.0's built-in CORSMiddleware blocks WebSocket
+    connections with 403 Forbidden even with allow_origins=["*"].
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        # Handle preflight (OPTIONS)
+        if request.method == "OPTIONS":
+            response = Response(status_code=200)
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "*"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            response.headers["Access-Control-Max-Age"] = "3600"
+            return response
+
+        response = await call_next(request)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "*"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+
+app.add_middleware(CORSMiddlewareHTTPOnly)
+
 
 # ── Mount REST routes ─────────────────────────────────────────
 app.include_router(api_router, prefix="/api")
@@ -68,7 +92,7 @@ app.include_router(api_router, prefix="/api")
 
 # ── WebSocket route ───────────────────────────────────────────
 @app.websocket("/ws/{session_id}")
-async def ws_route(websocket, session_id: str):
+async def ws_route(websocket: WebSocket, session_id: str):
     """WebSocket endpoint for real-time audio streaming."""
     await websocket_endpoint(websocket, session_id)
 

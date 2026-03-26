@@ -49,17 +49,23 @@ async def generate_response(
     intent: str,
     language: str = "en",
     custom_text: Optional[str] = None,
+    stress_score: float = 0.0,
 ) -> dict:
     """
     Generate a voice response for the detected intent.
+
+    The voice profile is emotion-adaptive:
+      - stress_score < 0.65 → "normal" profile
+      - stress_score >= 0.65 → "calm" profile (slower, softer TTS tone)
 
     Args:
         intent: Detected intent label.
         language: Response language code ('en', 'hi', 'mr', 'ta', etc.).
         custom_text: Optional override text (skips canned responses).
+        stress_score: Customer stress level (0.0–1.0) from sentiment_analyzer.
 
     Returns:
-        dict with keys: text, language, audio_available.
+        dict with keys: text, language, audio_available, voice_profile.
     """
     if custom_text:
         response_text = custom_text
@@ -72,10 +78,17 @@ async def generate_response(
     else:
         response_text = _RESPONSES_EN.get(intent, _RESPONSES_EN["general_query"])
 
-    logger.info("Voice response: intent=%s lang=%s text='%s'", intent, language, response_text[:50])
+    # Emotion-adaptive voice profile (Section 2 Step 7)
+    voice_profile = "calm" if stress_score >= 0.65 else "normal"
+
+    logger.info(
+        "Voice response: intent=%s lang=%s profile=%s text='%s'",
+        intent, language, voice_profile, response_text[:50],
+    )
 
     return {
         "text": response_text,
         "language": language,
-        "audio_available": False,  # TTS mock — no real audio
+        "audio_available": False,  # TTS mock — no real audio yet
+        "voice_profile": voice_profile,
     }

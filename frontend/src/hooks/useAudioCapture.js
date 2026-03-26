@@ -1,29 +1,28 @@
 /**
- * Linguist-Guardian — Audio Capture Hook.
+ * Linguist-Guardian — Audio Capture Hook (Press-to-Talk).
  *
- * Uses the MediaRecorder API to capture microphone audio and
- * stream it as chunks for WebSocket transmission.
+ * Captures microphone audio as a SINGLE complete blob.
+ * Audio is collected while the user holds the mic button,
+ * then sent as ONE blob when recording stops.
  *
- * Features:
- *   • Start/stop recording
- *   • Chunk streaming at configurable intervals (default 2s)
- *   • Returns audio blobs for WS transmission
+ * This prevents the auto-message bug where chunk-streaming
+ * triggered a new STT response every 2 seconds.
  */
 
 import { useCallback, useRef, useState } from 'react';
 
-const DEFAULT_CHUNK_INTERVAL = 2000; // 2 seconds
-
-export default function useAudioCapture(onAudioChunk, chunkInterval = DEFAULT_CHUNK_INTERVAL) {
+export default function useAudioCapture(onAudioComplete) {
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState(null);
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
+  const chunksRef = useRef([]);
 
   /** Start capturing audio from the microphone. */
   const startRecording = useCallback(async () => {
     try {
       setError(null);
+      chunksRef.current = [];
 
       // Request microphone access
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -44,10 +43,23 @@ export default function useAudioCapture(onAudioChunk, chunkInterval = DEFAULT_CH
 
       const recorder = new MediaRecorder(stream, { mimeType });
 
+      // Collect chunks into array (don't send them yet)
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
-          onAudioChunk?.(event.data);
+          chunksRef.current.push(event.data);
         }
+      };
+
+      // When recording stops, combine all chunks into ONE blob and send
+      recorder.onstop = () => {
+        if (chunksRef.current.length > 0) {
+          const completeBlob = new Blob(chunksRef.current, { type: mimeType });
+          console.log('[Audio] Complete recording:', completeBlob.size, 'bytes');
+          if (completeBlob.size > 100) {
+            onAudioComplete?.(completeBlob);
+          }
+        }
+        chunksRef.current = [];
       };
 
       recorder.onerror = (event) => {
@@ -56,8 +68,8 @@ export default function useAudioCapture(onAudioChunk, chunkInterval = DEFAULT_CH
         stopRecording();
       };
 
-      // Start recording with chunk interval
-      recorder.start(chunkInterval);
+      // Start recording — collect data in 500ms intervals (internal only)
+      recorder.start(500);
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
 
@@ -67,12 +79,12 @@ export default function useAudioCapture(onAudioChunk, chunkInterval = DEFAULT_CH
       setError(err.message || 'Microphone access denied');
       setIsRecording(false);
     }
-  }, [onAudioChunk, chunkInterval]);
+  }, [onAudioComplete]);
 
-  /** Stop recording and release the microphone. */
+  /** Stop recording, combine audio, and send ONE blob. */
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stop(); // triggers onstop → sends combined blob
     }
 
     if (streamRef.current) {

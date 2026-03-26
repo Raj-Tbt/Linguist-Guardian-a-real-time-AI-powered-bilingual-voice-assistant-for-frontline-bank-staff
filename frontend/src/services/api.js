@@ -53,6 +53,10 @@ export async function getSession(sessionId) {
   return request(`/sessions/${sessionId}`);
 }
 
+export async function endSession(sessionId) {
+  return request(`/sessions/${sessionId}/end`, { method: 'POST' });
+}
+
 // ── Messages ─────────────────────────────────────────────────
 
 export async function getMessages(sessionId) {

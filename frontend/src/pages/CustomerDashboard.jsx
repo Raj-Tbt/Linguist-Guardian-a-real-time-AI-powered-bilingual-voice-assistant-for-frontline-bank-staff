@@ -12,7 +12,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import useWebSocket from '../hooks/useWebSocket';
-import useAudioCapture from '../hooks/useAudioCapture';
+import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import ChatPanel from '../components/ChatPanel';
 import { listActiveSessions, joinSession } from '../services/api';
 
@@ -64,6 +64,7 @@ export default function CustomerDashboard() {
   const handleWSMessage = useCallback((msg) => {
     switch (msg.type) {
       case 'transcription':
+        // Audio was captured by mic → STT result → show as customer's own message
         setMessages((prev) => [
           ...prev,
           {
@@ -76,34 +77,27 @@ export default function CustomerDashboard() {
         ]);
         break;
 
-      case 'translation':
-        setCurrentIntent(msg.data.intent);
-        setMessages((prev) => {
-          const updated = [...prev];
-          const lastIdx = updated.findLastIndex((m) => m.role === 'customer');
-          if (lastIdx >= 0) {
-            updated[lastIdx] = {
-              ...updated[lastIdx],
-              translated_text: msg.data.translated_text,
-              intent: msg.data.intent,
-            };
-          }
-          return updated;
-        });
-        break;
+      case 'message': {
+        // Only show messages from the OTHER party (staff)
+        // Customer's own messages are already added locally in handleSendText
+        if (msg.data.role === 'customer') break;
 
-      case 'voice_response':
+        // Staff reply arrived — show it with translation to customer's language
+        setCurrentIntent(msg.data.intent);
         setMessages((prev) => [
           ...prev,
           {
-            id: Date.now() + 1,
-            role: 'system',
-            original_text: msg.data.text,
-            language: msg.data.language,
+            id: Date.now(),
+            role: 'staff',
+            original_text: msg.data.translated_text, // show the translated version as primary
+            translated_text: msg.data.original_text,  // show original English as secondary
+            intent: msg.data.intent,
+            language: msg.data.target_language,
             created_at: new Date().toISOString(),
           },
         ]);
         break;
+      }
 
       case 'fsm_update':
         break;
@@ -119,14 +113,17 @@ export default function CustomerDashboard() {
   }, []);
 
   // ── Hooks ──────────────────────────────────────────────────
-  const { isConnected, sendMessage, sendAudio } = useWebSocket(sessionId, handleWSMessage);
+  const { isConnected, sendMessage } = useWebSocket(sessionId, handleWSMessage);
 
-  const handleAudioChunk = useCallback(
-    (blob) => sendAudio(blob),
-    [sendAudio]
+  // Speech recognition — text goes into input field in customer's language
+  const handleSpeechResult = useCallback((text, isFinal) => {
+    setTextInput(text);
+  }, []);
+
+  const { isListening, error: speechError, toggleListening } = useSpeechRecognition(
+    handleSpeechResult,
+    language,
   );
-
-  const { isRecording, toggleRecording } = useAudioCapture(handleAudioChunk);
 
   // ── Handlers ───────────────────────────────────────────────
   const handleJoinSession = async (sid) => {
@@ -137,9 +134,18 @@ export default function CustomerDashboard() {
       });
       setSessionId(sid);
       setMessages([]);
+      setCurrentIntent(null);
     } catch (err) {
       console.error('Failed to join session:', err);
     }
+  };
+
+  /** End Conversation — clears chat, returns to welcome screen */
+  const handleEndConversation = () => {
+    setSessionId(null);
+    setMessages([]);
+    setTextInput('');
+    setCurrentIntent(null);
   };
 
   const handleSendText = () => {
@@ -251,39 +257,37 @@ export default function CustomerDashboard() {
               />
             </div>
 
-            {/* Active sessions list */}
+            {/* Active sessions list — show ONLY the latest */}
             <div className="mb-4">
               <label className="block text-xs text-gray-500 mb-2 uppercase tracking-wider">
-                Available Sessions
+                Available Session
               </label>
               {loadingSessions ? (
-                <div className="text-gray-500 text-sm py-4">Loading sessions…</div>
+                <div className="text-gray-500 text-sm py-4">Loading…</div>
               ) : activeSessions.length === 0 ? (
                 <div className="text-gray-500 text-sm py-4 glass-card">
                   <div className="text-3xl mb-2">⏳</div>
                   No active sessions. Please wait for staff to create one.
                 </div>
               ) : (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {activeSessions.map((session) => (
-                    <button
-                      key={session.id}
-                      onClick={() => handleJoinSession(session.id)}
-                      className="w-full glass-card-hover p-3 text-left flex items-center justify-between group"
-                    >
-                      <div>
-                        <div className="text-sm text-white font-medium">
-                          {session.staff_name || 'Staff'} — {(session.process_type || 'general').replace(/_/g, ' ')}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          ID: {session.id.slice(0, 8)}…
-                        </div>
+                <div>
+                  {/* Show ONLY the first (latest) session */}
+                  <button
+                    onClick={() => handleJoinSession(activeSessions[0].id)}
+                    className="w-full glass-card-hover p-4 text-left flex items-center justify-between group"
+                  >
+                    <div>
+                      <div className="text-sm text-white font-medium">
+                        {activeSessions[0].staff_name || 'Staff'} — {(activeSessions[0].process_type || 'general').replace(/_/g, ' ')}
                       </div>
-                      <span className="text-indigo-400 text-sm group-hover:translate-x-1 transition-transform">
-                        Join →
-                      </span>
-                    </button>
-                  ))}
+                      <div className="text-xs text-gray-500 mt-1">
+                        Tap to join this session
+                      </div>
+                    </div>
+                    <span className="text-indigo-400 text-sm group-hover:translate-x-1 transition-transform">
+                      Join →
+                    </span>
+                  </button>
                 </div>
               )}
             </div>
@@ -292,13 +296,26 @@ export default function CustomerDashboard() {
               onClick={fetchSessions}
               className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
             >
-              🔄 Refresh Sessions
+              🔄 Refresh
             </button>
           </div>
         </div>
       ) : (
         /* Chat interface */
         <div className="flex flex-col h-[calc(100vh-180px)]">
+          {/* Chat header with End Conversation button */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-400">💬 Active Conversation</span>
+            </div>
+            <button
+              onClick={handleEndConversation}
+              className="px-4 py-2 rounded-xl text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all"
+            >
+              ✕ End Conversation
+            </button>
+          </div>
+
           <div className="flex-1 min-h-0 mb-4">
             <ChatPanel messages={messages} />
           </div>
@@ -308,15 +325,15 @@ export default function CustomerDashboard() {
             <div className="flex items-center gap-3">
               {/* Large microphone button */}
               <button
-                onClick={toggleRecording}
+                onClick={toggleListening}
                 className={`p-4 rounded-2xl transition-all ${
-                  isRecording
+                  isListening
                     ? 'bg-red-500 text-white recording-pulse scale-110'
                     : 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/30'
                 }`}
-                title={isRecording ? 'Stop recording' : 'Tap to speak'}
+                title={isListening ? 'Stop listening' : 'Tap to speak'}
               >
-                <span className="text-2xl">{isRecording ? '⏹️' : '🎙️'}</span>
+                <span className="text-2xl">{isListening ? '⏹️' : '🎙️'}</span>
               </button>
 
               {/* Text input */}
@@ -326,9 +343,11 @@ export default function CustomerDashboard() {
                   onChange={(e) => setTextInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder={
-                    selectedLang?.code === 'en'
-                      ? 'Type your message…'
-                      : `Type in ${selectedLang?.name || 'your language'}…`
+                    isListening
+                      ? `Listening in ${selectedLang?.name || 'your language'}…`
+                      : selectedLang?.code === 'en'
+                        ? 'Type or tap 🎙️ to speak…'
+                        : `Type in ${selectedLang?.name || 'your language'} or tap 🎙️…`
                   }
                   className="glass-input flex-1"
                 />
@@ -342,10 +361,16 @@ export default function CustomerDashboard() {
               </div>
             </div>
 
-            {isRecording && (
+            {isListening && (
               <div className="mt-3 flex items-center justify-center gap-2 text-red-400 text-sm animate-pulse-soft">
                 <span className="w-2 h-2 rounded-full bg-red-500" />
-                Recording… Speak now
+                Listening… Speak now in {selectedLang?.name || 'your language'}
+              </div>
+            )}
+
+            {speechError && (
+              <div className="mt-3 text-center text-xs text-amber-400 bg-amber-500/10 rounded-lg py-2 px-3">
+                ⚠️ {speechError}
               </div>
             )}
           </div>

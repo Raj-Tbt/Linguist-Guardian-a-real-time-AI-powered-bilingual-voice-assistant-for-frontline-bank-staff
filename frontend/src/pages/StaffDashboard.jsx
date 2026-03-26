@@ -21,13 +21,14 @@
 
 import { useState, useCallback } from 'react';
 import useWebSocket from '../hooks/useWebSocket';
-import useAudioCapture from '../hooks/useAudioCapture';
+import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import ChatPanel from '../components/ChatPanel';
 import ComplianceAlerts from '../components/ComplianceAlerts';
 import FSMTracker from '../components/FSMTracker';
 import DocumentUpload from '../components/DocumentUpload';
 import SessionSummary from '../components/SessionSummary';
-import { createSession, advanceFSM, getFSMState } from '../services/api';
+import SentimentMeter from '../components/SentimentMeter';
+import { createSession, endSession, advanceFSM, getFSMState } from '../services/api';
 
 export default function StaffDashboard() {
   // ── State ──────────────────────────────────────────────────
@@ -38,37 +39,34 @@ export default function StaffDashboard() {
   const [textInput, setTextInput] = useState('');
   const [processType, setProcessType] = useState('account_opening');
   const [copiedId, setCopiedId] = useState(false);
+  const [stressScore, setStressScore] = useState(0);
+  const [deEscalate, setDeEscalate] = useState(false);
+  const [currentIntent, setCurrentIntent] = useState(null);
 
   // ── WebSocket message handler ──────────────────────────────
   const handleWSMessage = useCallback((msg) => {
     switch (msg.type) {
-      case 'transcription':
+      case 'message': {
+        // Only show messages from the OTHER party (customer)
+        // Staff's own messages are already added locally in handleSendText
+        if (msg.data.role === 'staff') break;
+
+        // Customer message arrived — show it with translation
+        setCurrentIntent(msg.data.intent);
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now(),
             role: 'customer',
-            original_text: msg.data.text,
-            language: msg.data.language,
+            original_text: msg.data.original_text,
+            translated_text: msg.data.translated_text,
+            intent: msg.data.intent,
+            language: msg.data.source_language,
             created_at: new Date().toISOString(),
           },
         ]);
         break;
-
-      case 'translation':
-        setMessages((prev) => {
-          const updated = [...prev];
-          const lastCustomerIdx = updated.findLastIndex((m) => m.role === 'customer');
-          if (lastCustomerIdx >= 0) {
-            updated[lastCustomerIdx] = {
-              ...updated[lastCustomerIdx],
-              translated_text: msg.data.translated_text,
-              intent: msg.data.intent,
-            };
-          }
-          return updated;
-        });
-        break;
+      }
 
       case 'compliance':
         if (!msg.data.is_compliant) {
@@ -76,17 +74,9 @@ export default function StaffDashboard() {
         }
         break;
 
-      case 'voice_response':
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: Date.now() + 1,
-            role: 'system',
-            original_text: msg.data.text,
-            language: msg.data.language,
-            created_at: new Date().toISOString(),
-          },
-        ]);
+      case 'sentiment':
+        setStressScore(msg.data.stress_score);
+        setDeEscalate(msg.data.de_escalate);
         break;
 
       case 'fsm_update':
@@ -104,26 +94,37 @@ export default function StaffDashboard() {
   }, []);
 
   // ── Hooks ──────────────────────────────────────────────────
-  const { isConnected, sendMessage, sendAudio } = useWebSocket(sessionId, handleWSMessage);
+  const { isConnected, sendMessage } = useWebSocket(sessionId, handleWSMessage);
 
-  const handleAudioChunk = useCallback(
-    (blob) => sendAudio(blob),
-    [sendAudio]
+  // Speech recognition — text goes into input field in English
+  const handleSpeechResult = useCallback((text, isFinal) => {
+    setTextInput(text);
+  }, []);
+
+  const { isListening, error: speechError, toggleListening } = useSpeechRecognition(
+    handleSpeechResult,
+    'en',
   );
-
-  const { isRecording, toggleRecording } = useAudioCapture(handleAudioChunk);
 
   // ── Handlers ───────────────────────────────────────────────
   const handleCreateSession = async () => {
     try {
+      // Clear ALL previous session state (Fix #6)
+      setMessages([]);
+      setAlerts([]);
+      setStressScore(0);
+      setDeEscalate(false);
+      setCurrentIntent(null);
+      setFSMState({});
+      setTextInput('');
+      setCopiedId(false);
+
       const session = await createSession({
         staff_name: 'Staff Agent',
         language: 'en',
         process_type: processType,
       });
       setSessionId(session.id);
-      setMessages([]);
-      setAlerts([]);
 
       // Get initial FSM state
       const fsm = await getFSMState(session.id);
@@ -159,6 +160,25 @@ export default function StaffDashboard() {
       },
     ]);
     setTextInput('');
+  };
+
+  const handleEndSession = async () => {
+    if (!sessionId) return;
+    try {
+      await endSession(sessionId);
+    } catch (err) {
+      console.error('Failed to end session:', err);
+    }
+    // Reset ALL state back to welcome screen
+    setSessionId(null);
+    setMessages([]);
+    setAlerts([]);
+    setStressScore(0);
+    setDeEscalate(false);
+    setCurrentIntent(null);
+    setFSMState({});
+    setTextInput('');
+    setCopiedId(false);
   };
 
   const handleAdvanceFSM = async (targetState) => {
@@ -206,6 +226,13 @@ export default function StaffDashboard() {
               </span>
             </div>
 
+            {/* Intent indicator */}
+            {currentIntent && (
+              <span className="badge bg-purple-500/20 text-purple-400 border border-purple-500/30 text-xs">
+                🎯 {currentIntent.replace(/_/g, ' ')}
+              </span>
+            )}
+
             {/* Session controls */}
             {!sessionId ? (
               <div className="flex gap-2">
@@ -229,6 +256,12 @@ export default function StaffDashboard() {
                   title="Click to copy session ID"
                 >
                   📋 {copiedId ? 'Copied!' : `Session: ${sessionId.slice(0, 8)}…`}
+                </button>
+                <button
+                  onClick={handleEndSession}
+                  className="px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all"
+                >
+                  ✕ End Session
                 </button>
               </div>
             )}
@@ -281,41 +314,57 @@ export default function StaffDashboard() {
             </div>
 
             {/* Input area */}
-            <div className="glass-card p-3 flex items-center gap-3">
-              {/* Microphone button */}
-              <button
-                onClick={toggleRecording}
-                className={`p-3 rounded-xl transition-all ${
-                  isRecording
-                    ? 'bg-red-500 text-white recording-pulse'
-                    : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white'
-                }`}
-                title={isRecording ? 'Stop recording' : 'Start recording'}
-              >
-                {isRecording ? '⏹️' : '🎙️'}
-              </button>
+            <div className="glass-card p-3 flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                {/* Microphone button */}
+                <button
+                  onClick={toggleListening}
+                  className={`p-3 rounded-xl transition-all ${
+                    isListening
+                      ? 'bg-red-500 text-white recording-pulse'
+                      : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white'
+                  }`}
+                  title={isListening ? 'Stop listening' : 'Start voice input'}
+                >
+                  {isListening ? '⏹️' : '🎙️'}
+                </button>
 
-              {/* Text input */}
-              <input
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type a message in English…"
-                className="glass-input flex-1 text-sm"
-              />
+                {/* Text input */}
+                <input
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={isListening ? 'Listening… Speak now' : 'Type a message in English or tap 🎙️…'}
+                  className="glass-input flex-1 text-sm"
+                />
 
-              <button
-                onClick={handleSendText}
-                disabled={!textInput.trim()}
-                className="btn-primary text-sm"
-              >
-                Send ➤
-              </button>
+                <button
+                  onClick={handleSendText}
+                  disabled={!textInput.trim()}
+                  className="btn-primary text-sm"
+                >
+                  Send ➤
+                </button>
+              </div>
+
+              {isListening && (
+                <div className="flex items-center justify-center gap-2 text-red-400 text-xs animate-pulse-soft">
+                  <span className="w-2 h-2 rounded-full bg-red-500" />
+                  Listening… Speak now in English
+                </div>
+              )}
+
+              {speechError && (
+                <div className="text-center text-xs text-amber-400 bg-amber-500/10 rounded-lg py-1.5 px-3">
+                  ⚠️ {speechError}
+                </div>
+              )}
             </div>
           </div>
 
           {/* Right column — Panels */}
           <div className="space-y-4 overflow-y-auto">
+            <SentimentMeter stressScore={stressScore} deEscalate={deEscalate} />
             <ComplianceAlerts alerts={alerts} />
             <FSMTracker
               processType={fsmState.process_type}

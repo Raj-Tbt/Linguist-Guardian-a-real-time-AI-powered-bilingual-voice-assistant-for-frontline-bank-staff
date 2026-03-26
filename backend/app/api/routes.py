@@ -513,9 +513,17 @@ async def generate_summary(
         .order_by(Message.created_at.asc())
     )
     messages = result.scalars().all()
-    texts = [m.original_text for m in messages]
 
-    summary_data = await summary_service.generate_summary(texts)
+    if not messages:
+        raise HTTPException(400, "No messages in this session yet. Start a conversation first.")
+
+    texts = [m.original_text for m in messages if m.original_text]
+
+    try:
+        summary_data = await summary_service.generate_summary(texts)
+    except Exception as exc:
+        logger.error("Summary generation failed: %s", exc)
+        raise HTTPException(500, f"Summary generation failed: {str(exc)}")
 
     summary = Summary(
         session_id=session_id,
@@ -523,7 +531,7 @@ async def generate_summary(
         summary_hi=summary_data.get("summary_hi"),
     )
     db.add(summary)
-    await db.flush()
+    await db.commit()
     await db.refresh(summary)
     return summary
 
@@ -555,6 +563,98 @@ async def process_text(text: str, target_language: str = None):
         translated_text=result["translated_text"],
         confidence=result.get("confidence", 1.0),
     )
+
+
+# ━━━━━━━━━━━━━━━  Document Upload + Verify  ━━━━━━━━━━━━━━━━━━
+
+@router.post("/verify-document-upload", tags=["Documents"])
+async def verify_document_upload(
+    file: UploadFile = File(...),
+    document_type: str = Form("aadhaar"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    End-to-end document verification:
+
+    1. Receive uploaded document image (Aadhaar / PAN)
+    2. Extract data using GPT-4o Vision OCR
+    3. Match extracted data against the database using Jaro-Winkler + Levenshtein
+    4. Return extraction results, per-field match scores, and verification status
+
+    Status codes:
+      • verified    — all fields match (✅ Valid Customer)
+      • needs_review — partial match (⚠️ Needs Review)
+      • not_verified — no match at all (❌ Invalid Customer)
+      • not_found   — no matching user in DB (🔍 No Match)
+      • rejected    — image could not be processed (🚫 Rejected)
+    """
+    # Read file bytes
+    image_bytes = await file.read()
+
+    # Step 1: GPT-4o Vision OCR extraction
+    extraction = await document_ocr.extract_document_data(
+        image_bytes=image_bytes,
+        filename=file.filename or "document.jpg",
+        document_type=document_type,
+    )
+
+    # If extraction failed, return error
+    if extraction.get("error"):
+        return {
+            "status": "rejected",
+            "extraction": extraction,
+            "verification": None,
+        }
+
+    # Step 2: Verify against database
+    verify_request = DocumentVerifyRequest(
+        document_type=extraction.get("document_type", document_type),
+        extracted_name=extraction.get("extracted_name", ""),
+        extracted_number=extraction.get("extracted_number", ""),
+        extracted_dob=extraction.get("extracted_dob", ""),
+    )
+
+    verification = await document_verification.verify_document(verify_request, db)
+
+    # Step 3: Determine final status
+    if not verification.user_found:
+        status = "not_found"
+    elif verification.verified:
+        status = "verified"
+    else:
+        # Check how many fields match for needs_review vs not_verified
+        match_count = sum(1 for r in verification.results if r.match)
+        if match_count > 0:
+            status = "needs_review"
+        else:
+            status = "not_verified"
+
+    # Step 4: Calculate overall confidence score
+    if verification.results:
+        overall_confidence = sum(r.score for r in verification.results) / len(verification.results)
+    else:
+        overall_confidence = 0.0
+
+    return {
+        "status": status,
+        "overall_confidence": round(overall_confidence, 4),
+        "extraction": extraction,
+        "verification": {
+            "verified": verification.verified,
+            "user_found": verification.user_found,
+            "results": [
+                {
+                    "field": r.field,
+                    "submitted": r.submitted,
+                    "reference": r.reference,
+                    "method": r.method,
+                    "score": r.score,
+                    "match": r.match,
+                }
+                for r in verification.results
+            ],
+        },
+    }
 
 
 # ━━━━━━━━━━━━━━━  Fake Users  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

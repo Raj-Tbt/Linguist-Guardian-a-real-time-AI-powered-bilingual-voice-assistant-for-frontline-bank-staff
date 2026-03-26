@@ -18,8 +18,9 @@ from app.models.models import FakeUser
 
 # ── 20 Sample Users ──────────────────────────────────────────
 FAKE_USERS: List[Dict[str, str]] = [
-    {"name": "Rajesh Kumar Sharma", "pan_number": "ABCPS1234K", "aadhaar_number": "234567890123", "dob": "15/03/1985", "address": "12, MG Road, Lucknow, UP", "phone": "9876543210"},
     {"name": "Priya Devi Singh", "pan_number": "BDFPS5678L", "aadhaar_number": "345678901234", "dob": "22/07/1990", "address": "45, Nehru Nagar, Patna, Bihar", "phone": "9876543211"},
+    {"name": "Aditya Rajesh Yadav", "pan_number": "ARYPA2610F", "aadhaar_number": "608544627814", "dob": "26/10/2006", "address": "45, Nehru Nagar, Patna, Bihar", "phone": "9876543211"},
+    {"name": "Rajesh Kumar Sharma", "pan_number": "ABCPS1234K", "aadhaar_number": "234567890123", "dob": "15/03/1985", "address": "12, MG Road, Lucknow, UP", "phone": "9876543210"},
     {"name": "Amit Kumar Verma", "pan_number": "CDGPV9012M", "aadhaar_number": "456789012345", "dob": "08/11/1988", "address": "78, Civil Lines, Bhopal, MP", "phone": "9876543212"},
     {"name": "Sunita Rani Gupta", "pan_number": "DEHPG3456N", "aadhaar_number": "567890123456", "dob": "30/01/1975", "address": "23, Gandhi Marg, Jaipur, Rajasthan", "phone": "9876543213"},
     {"name": "Vikram Singh Chauhan", "pan_number": "EFIPC7890P", "aadhaar_number": "678901234567", "dob": "14/06/1982", "address": "56, Station Road, Dehradun, UK", "phone": "9876543214"},

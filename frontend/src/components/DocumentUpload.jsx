@@ -164,7 +164,7 @@ export default function DocumentUpload() {
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="animate-spin">⏳</span> Analyzing document…
+                <span className="animate-spin">⏳</span> Processing… Extracting data with AI Vision
               </span>
             ) : '🔍 Verify Document'}
           </button>
@@ -173,8 +173,15 @@ export default function DocumentUpload() {
 
       {/* Error */}
       {error && (
-        <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
-          {error}
+        <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm">
+          <p className="text-red-400">{error}</p>
+          <button
+            onClick={handleVerify}
+            disabled={loading}
+            className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+          >
+            🔄 Retry Verification
+          </button>
         </div>
       )}
 
@@ -201,6 +208,11 @@ export default function DocumentUpload() {
               {statusInfo.label}
             </span>
             <p className="text-xs text-gray-400 mt-1">{statusInfo.desc}</p>
+            {result.overall_confidence != null && (
+              <p className="text-xs text-indigo-400 font-mono mt-1">
+                Overall Match: {(result.overall_confidence * 100).toFixed(1)}%
+              </p>
+            )}
           </div>
 
           {/* Extracted data preview */}

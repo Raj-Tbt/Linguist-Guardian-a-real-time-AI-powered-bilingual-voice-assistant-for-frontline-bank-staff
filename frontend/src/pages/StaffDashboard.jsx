@@ -19,7 +19,7 @@
  *   • Session summary generation
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import useWebSocket from '../hooks/useWebSocket';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import useTextToSpeech from '../hooks/useTextToSpeech';
@@ -34,6 +34,7 @@ import { createSession, endSession } from '../services/api';
 export default function StaffDashboard() {
   // ── State ──────────────────────────────────────────────────
   const [sessionId, setSessionId] = useState(null);
+  const [autoMic, setAutoMic] = useState(true); // Auto-mic ON by default
   const [messages, setMessages] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [detectedIntents, setDetectedIntents] = useState([]);
@@ -42,6 +43,13 @@ export default function StaffDashboard() {
   const [stressScore, setStressScore] = useState(0);
   const [deEscalate, setDeEscalate] = useState(false);
   const [currentIntent, setCurrentIntent] = useState(null);
+
+  // Refs for stable callback access inside useCallback
+  const queueSpeakRef = useRef(null);
+  const startListeningRef = useRef(null);
+  const stopListeningRef = useRef(null);
+  const autoMicRef = useRef(true);
+  const isSpeakingRef = useRef(false);
 
   // ── WebSocket message handler ──────────────────────────────
   const handleWSMessage = useCallback((msg) => {
@@ -52,19 +60,28 @@ export default function StaffDashboard() {
         if (msg.data.role === 'staff') break;
 
         // Customer message arrived — show it with translation
+        // Swap: show English translation as primary, original Hindi as secondary
         setCurrentIntent(msg.data.intent);
+        const msgId = Date.now();
         setMessages((prev) => [
           ...prev,
           {
-            id: Date.now(),
+            id: msgId,
             role: 'customer',
-            original_text: msg.data.original_text,
-            translated_text: msg.data.translated_text,
+            original_text: msg.data.translated_text,   // English translation as primary
+            translated_text: msg.data.original_text,    // Original Hindi/regional as secondary
             intent: msg.data.intent,
             language: msg.data.source_language,
             created_at: new Date().toISOString(),
           },
         ]);
+
+        // Auto-TTS: Read customer message aloud in English (translated)
+        // Mic activation happens via onSpeechEndRef callback (after TTS finishes)
+        if (queueSpeakRef.current) {
+          const textToSpeak = msg.data.translated_text || msg.data.original_text;
+          queueSpeakRef.current(textToSpeak, 'en', msgId);
+        }
         break;
       }
 
@@ -114,13 +131,23 @@ export default function StaffDashboard() {
     setTextInput(text);
   }, []);
 
-  const { isListening, error: speechError, toggleListening } = useSpeechRecognition(
+  const { isListening, error: speechError, toggleListening, startListening, stopListening } = useSpeechRecognition(
     handleSpeechResult,
     'en',
   );
 
   // Text-to-speech — staff hears customer messages in English
-  const { speak, stop: stopSpeaking, isSpeaking } = useTextToSpeech('en');
+  const { speak, stop: stopSpeaking, isSpeaking, autoPlay, setAutoPlay, queueSpeak, onSpeechEndRef } = useTextToSpeech('en');
+
+  // Auto-activate mic precisely when TTS finishes playing
+  onSpeechEndRef.current = () => {
+    if (autoMic && !isListening) {
+      startListening();
+    }
+  };
+
+  // Keep refs in sync for stable callback access inside useCallback
+  queueSpeakRef.current = queueSpeak;
 
   // ── Handlers ───────────────────────────────────────────────
   const handleCreateSession = async () => {
@@ -171,6 +198,11 @@ export default function StaffDashboard() {
       },
     ]);
     setTextInput('');
+
+    // Auto-deactivate mic after sending
+    if (isListening) {
+      stopListening();
+    }
   };
 
   const handleEndSession = async () => {
@@ -250,6 +282,38 @@ export default function StaffDashboard() {
                 >
                   📋 {copiedId ? 'Copied!' : `Session: ${sessionId.slice(0, 8)}…`}
                 </button>
+                {/* Auto-Speech Toggle */}
+                <button
+                  onClick={() => setAutoPlay(!autoPlay)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1 ${
+                    autoPlay
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
+                      : 'bg-white/5 text-gray-500 border border-white/10 hover:bg-white/10'
+                  }`}
+                  title={autoPlay ? 'Auto-speech is ON' : 'Auto-speech is OFF'}
+                >
+                  {autoPlay ? '🔊' : '🔇'}
+                </button>
+                {/* Auto-Mic Toggle */}
+                <button
+                  onClick={() => setAutoMic(!autoMic)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1 ${
+                    autoMic
+                      ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30 hover:bg-sky-500/30'
+                      : 'bg-white/5 text-gray-500 border border-white/10 hover:bg-white/10'
+                  }`}
+                  title={autoMic ? 'Auto-mic is ON' : 'Auto-mic is OFF'}
+                >
+                  {autoMic ? '🎙️' : '🎙️✗'}
+                </button>
+                {isSpeaking && (
+                  <button
+                    onClick={stopSpeaking}
+                    className="px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition-all"
+                  >
+                    ⏹ Stop
+                  </button>
+                )}
                 <button
                   onClick={handleEndSession}
                   className="px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all"
@@ -368,7 +432,7 @@ export default function StaffDashboard() {
             <ComplianceAlerts alerts={alerts} />
             <IntentGuidance detectedIntents={detectedIntents} />
             <DocumentUpload />
-            <SessionSummary sessionId={sessionId} />
+            <SessionSummary sessionId={sessionId} messages={messages} alerts={alerts} />
           </div>
         </div>
       )}

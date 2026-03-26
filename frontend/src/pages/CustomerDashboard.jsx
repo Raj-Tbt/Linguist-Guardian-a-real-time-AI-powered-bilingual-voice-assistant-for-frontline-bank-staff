@@ -10,7 +10,7 @@
  * Designed for the customer sitting across the counter.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import useWebSocket from '../hooks/useWebSocket';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import useTextToSpeech from '../hooks/useTextToSpeech';
@@ -39,6 +39,14 @@ export default function CustomerDashboard() {
   const [activeSessions, setActiveSessions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [customerName, setCustomerName] = useState('');
+  const [autoMic, setAutoMic] = useState(true); // Auto-mic ON by default
+
+  // Refs for stable callback access inside useCallback
+  const queueSpeakRef = useRef(null);
+  const startListeningRef = useRef(null);
+  const stopListeningRef = useRef(null);
+  const autoMicRef = useRef(true);
+  const isSpeakingRef = useRef(false);
 
   // ── Load active sessions ───────────────────────────────────
   const fetchSessions = useCallback(async () => {
@@ -85,10 +93,11 @@ export default function CustomerDashboard() {
 
         // Staff reply arrived — show it with translation to customer's language
         setCurrentIntent(msg.data.intent);
+        const msgId = Date.now();
         setMessages((prev) => [
           ...prev,
           {
-            id: Date.now(),
+            id: msgId,
             role: 'staff',
             original_text: msg.data.translated_text, // show the translated version as primary
             translated_text: msg.data.original_text,  // show original English as secondary
@@ -97,6 +106,14 @@ export default function CustomerDashboard() {
             created_at: new Date().toISOString(),
           },
         ]);
+
+        // Auto-TTS: Read staff message aloud in customer's selected language
+        // Mic activation happens via onSpeechEndRef callback (after TTS finishes)
+        if (queueSpeakRef.current) {
+          const textToSpeak = msg.data.translated_text || msg.data.original_text;
+          const spokenLang = msg.data.target_language || 'en';
+          queueSpeakRef.current(textToSpeak, spokenLang, msgId);
+        }
         break;
       }
 
@@ -121,13 +138,23 @@ export default function CustomerDashboard() {
     setTextInput(text);
   }, []);
 
-  const { isListening, error: speechError, toggleListening } = useSpeechRecognition(
+  const { isListening, error: speechError, toggleListening, startListening, stopListening } = useSpeechRecognition(
     handleSpeechResult,
     language,
   );
 
   // Text-to-speech — listen to staff responses in customer's language
-  const { speak, stop: stopSpeaking, isSpeaking } = useTextToSpeech(language);
+  const { speak, stop: stopSpeaking, isSpeaking, autoPlay, setAutoPlay, queueSpeak, onSpeechEndRef } = useTextToSpeech(language);
+
+  // Auto-activate mic precisely when TTS finishes playing
+  onSpeechEndRef.current = () => {
+    if (autoMic && !isListening) {
+      startListening();
+    }
+  };
+
+  // Keep ref in sync for stable callback access inside useCallback
+  queueSpeakRef.current = queueSpeak;
 
   // ── Handlers ───────────────────────────────────────────────
   const handleJoinSession = async (sid) => {
@@ -170,6 +197,11 @@ export default function CustomerDashboard() {
       },
     ]);
     setTextInput('');
+
+    // Auto-deactivate mic after sending
+    if (isListening) {
+      stopListening();
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -212,6 +244,38 @@ export default function CustomerDashboard() {
               <span className="badge bg-purple-500/20 text-purple-400 border border-purple-500/30 text-xs">
                 {currentIntent.replace(/_/g, ' ')}
               </span>
+            )}
+            {/* Auto-Speech Toggle */}
+            <button
+              onClick={() => setAutoPlay(!autoPlay)}
+              className={`px-2 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
+                autoPlay
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-white/5 text-gray-500 border border-white/10'
+              }`}
+              title={autoPlay ? 'Auto-speech ON' : 'Auto-speech OFF'}
+            >
+              {autoPlay ? '🔊' : '🔇'}
+            </button>
+            {/* Auto-Mic Toggle */}
+            <button
+              onClick={() => setAutoMic(!autoMic)}
+              className={`px-2 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
+                autoMic
+                  ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                  : 'bg-white/5 text-gray-500 border border-white/10'
+              }`}
+              title={autoMic ? 'Auto-mic ON' : 'Auto-mic OFF'}
+            >
+              {autoMic ? '🎙️' : '🎙️✗'}
+            </button>
+            {isSpeaking && (
+              <button
+                onClick={stopSpeaking}
+                className="px-2 py-1 rounded-lg text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-all"
+              >
+                ⏹
+              </button>
             )}
           </div>
         )}

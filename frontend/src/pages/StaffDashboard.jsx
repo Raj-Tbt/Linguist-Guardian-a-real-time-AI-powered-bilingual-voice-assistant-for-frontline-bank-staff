@@ -233,209 +233,200 @@ export default function StaffDashboard() {
 
   // ── Render ─────────────────────────────────────────────────
   return (
-    <div className="min-h-screen p-4 lg:p-6">
-      {/* Header */}
-      <header className="mb-6">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      {/* ── Top Navbar ── */}
+      <nav className="bank-navbar">
+        <div className="flex items-center gap-3">
+          <span className="text-xl">🏛️</span>
           <div>
-            <h1 className="text-2xl font-bold gradient-text">
-              Linguist-Guardian
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Staff Dashboard — AI Banking Assistant
-            </p>
+            <h1>Linguist-Guardian</h1>
+            <p className="subtitle">Staff Dashboard — Union Bank of India</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Connection status */}
+          <div className="flex items-center gap-1.5 bg-white/10 rounded-lg px-2.5 py-1">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isConnected ? 'bg-emerald-400 animate-pulse-soft' : 'bg-red-400'
+              }`}
+            />
+            <span className="text-[11px] text-white/80">
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </span>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Connection indicator */}
-            <div className="flex items-center gap-2">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  isConnected ? 'bg-emerald-400 animate-pulse-soft' : 'bg-red-400'
+          {currentIntent && (
+            <span className="bg-white/10 text-white/90 text-[11px] px-2.5 py-1 rounded-lg font-medium">
+              🎯 {currentIntent.replace(/_/g, ' ')}
+            </span>
+          )}
+
+          {!sessionId ? (
+            <button onClick={handleCreateSession} className="bg-white text-blue-700 text-xs font-bold px-4 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">
+              + New Session
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleCopySessionId}
+                className="bg-white/10 text-[11px] text-white/90 px-2.5 py-1 rounded-lg hover:bg-white/20 transition-colors flex items-center gap-1"
+                title="Click to copy session ID"
+              >
+                📋 {copiedId ? 'Copied!' : `${sessionId.slice(0, 8)}…`}
+              </button>
+              {/* Auto-Speech */}
+              <button
+                onClick={() => setAutoPlay(!autoPlay)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                  autoPlay
+                    ? 'bg-emerald-500/30 text-emerald-300'
+                    : 'bg-white/10 text-white/50'
                 }`}
-              />
-              <span className="text-xs text-gray-500">
-                {isConnected ? 'Connected' : 'Disconnected'}
-              </span>
-            </div>
-
-            {/* Intent indicator */}
-            {currentIntent && (
-              <span className="badge bg-purple-500/20 text-purple-400 border border-purple-500/30 text-xs">
-                🎯 {currentIntent.replace(/_/g, ' ')}
-              </span>
-            )}
-
-            {/* Session controls */}
-            {!sessionId ? (
-              <div className="flex gap-2">
-                <button onClick={handleCreateSession} className="btn-primary text-sm">
-                  🚀 Start New Session
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
+                title={autoPlay ? 'Auto-speech ON' : 'Auto-speech OFF'}
+              >
+                {autoPlay ? '🔊' : '🔇'}
+              </button>
+              {/* Auto-Mic */}
+              <button
+                onClick={() => setAutoMic(!autoMic)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                  autoMic
+                    ? 'bg-sky-500/30 text-sky-300'
+                    : 'bg-white/10 text-white/50'
+                }`}
+                title={autoMic ? 'Auto-mic ON' : 'Auto-mic OFF'}
+              >
+                {autoMic ? '🎙️' : '🎙️✗'}
+              </button>
+              {isSpeaking && (
                 <button
-                  onClick={handleCopySessionId}
-                  className="badge-info text-xs cursor-pointer hover:bg-indigo-500/20 transition-colors flex items-center gap-1"
-                  title="Click to copy session ID"
+                  onClick={stopSpeaking}
+                  className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-amber-500/30 text-amber-300 hover:bg-amber-500/40 transition-all"
                 >
-                  📋 {copiedId ? 'Copied!' : `Session: ${sessionId.slice(0, 8)}…`}
+                  ⏹
                 </button>
-                {/* Auto-Speech Toggle */}
-                <button
-                  onClick={() => setAutoPlay(!autoPlay)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1 ${
-                    autoPlay
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
-                      : 'bg-white/5 text-gray-500 border border-white/10 hover:bg-white/10'
-                  }`}
-                  title={autoPlay ? 'Auto-speech is ON' : 'Auto-speech is OFF'}
-                >
-                  {autoPlay ? '🔊' : '🔇'}
-                </button>
-                {/* Auto-Mic Toggle */}
-                <button
-                  onClick={() => setAutoMic(!autoMic)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1 ${
-                    autoMic
-                      ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30 hover:bg-sky-500/30'
-                      : 'bg-white/5 text-gray-500 border border-white/10 hover:bg-white/10'
-                  }`}
-                  title={autoMic ? 'Auto-mic is ON' : 'Auto-mic is OFF'}
-                >
-                  {autoMic ? '🎙️' : '🎙️✗'}
-                </button>
-                {isSpeaking && (
-                  <button
-                    onClick={stopSpeaking}
-                    className="px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition-all"
-                  >
-                    ⏹ Stop
-                  </button>
-                )}
-                <button
-                  onClick={handleEndSession}
-                  className="px-3 py-1.5 rounded-xl text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all"
-                >
-                  ✕ End Session
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Session sharing banner */}
-        {sessionId && isConnected && (
-          <div className="mt-3 glass-card p-3 flex items-center justify-between bg-emerald-500/5 border-emerald-500/20">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-emerald-400">✅</span>
-              <span className="text-gray-300">
-                Session active — Customer can now join from their dashboard
-              </span>
-            </div>
-            <button
-              onClick={handleCopySessionId}
-              className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
-            >
-              {copiedId ? '✓ Copied' : '📋 Copy ID'}
-            </button>
-          </div>
-        )}
-      </header>
-
-      {!sessionId ? (
-        /* Empty state */
-        <div className="flex items-center justify-center h-[60vh]">
-          <div className="text-center glass-card p-12">
-            <div className="text-6xl mb-4">🏛️</div>
-            <h2 className="text-xl font-semibold text-white mb-2">
-              Welcome to Linguist-Guardian
-            </h2>
-            <p className="text-gray-400 mb-6">
-              Select a process type and create a new session to begin.<br/>
-              The customer will be able to join your session automatically.
-            </p>
-            <button onClick={handleCreateSession} className="btn-primary">
-              🚀 Start New Session
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* Main layout */
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)]">
-          {/* Left column — Chat */}
-          <div className="lg:col-span-2 flex flex-col gap-4">
-            <div className="flex-1 min-h-0">
-              <ChatPanel
-                messages={messages}
-                onSpeak={speak}
-                isSpeaking={isSpeaking}
-                onStopSpeaking={stopSpeaking}
-                speakLanguage="en"
-                dashboardRole="staff"
-              />
-            </div>
-
-            {/* Input area */}
-            <div className="glass-card p-3 flex flex-col gap-2">
-              <div className="flex items-center gap-3">
-                {/* Microphone button */}
-                <button
-                  onClick={toggleListening}
-                  className={`p-3 rounded-xl transition-all ${
-                    isListening
-                      ? 'bg-red-500 text-white recording-pulse'
-                      : 'bg-white/10 text-gray-400 hover:bg-white/20 hover:text-white'
-                  }`}
-                  title={isListening ? 'Stop listening' : 'Start voice input'}
-                >
-                  {isListening ? '⏹️' : '🎙️'}
-                </button>
-
-                {/* Text input */}
-                <input
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={isListening ? 'Listening… Speak now' : 'Type a message in English or tap 🎙️…'}
-                  className="glass-input flex-1 text-sm"
-                />
-
-                <button
-                  onClick={handleSendText}
-                  disabled={!textInput.trim()}
-                  className="btn-primary text-sm"
-                >
-                  Send ➤
-                </button>
-              </div>
-
-              {isListening && (
-                <div className="flex items-center justify-center gap-2 text-red-400 text-xs animate-pulse-soft">
-                  <span className="w-2 h-2 rounded-full bg-red-500" />
-                  Listening… Speak now in English
-                </div>
               )}
-
-              {speechError && (
-                <div className="text-center text-xs text-amber-400 bg-amber-500/10 rounded-lg py-1.5 px-3">
-                  ⚠️ {speechError}
-                </div>
-              )}
+              <button
+                onClick={handleEndSession}
+                className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-red-500/30 text-red-300 hover:bg-red-500/40 transition-all"
+              >
+                ✕ End
+              </button>
             </div>
-          </div>
+          )}
+        </div>
+      </nav>
 
-          {/* Right column — Panels */}
-          <div className="space-y-4 overflow-y-auto">
-            <SentimentMeter stressScore={stressScore} deEscalate={deEscalate} />
-            <ComplianceAlerts alerts={alerts} />
-            <IntentGuidance detectedIntents={detectedIntents} />
-            <DocumentUpload />
-            <SessionSummary sessionId={sessionId} messages={messages} alerts={alerts} />
+      {/* ── Session sharing banner ── */}
+      {sessionId && isConnected && (
+        <div className="mx-4 mt-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-emerald-700">
+            <span>✅</span>
+            <span>Session active — Customer can join from their dashboard</span>
           </div>
+          <button
+            onClick={handleCopySessionId}
+            className="text-xs text-emerald-600 hover:text-emerald-800 font-medium transition-colors"
+          >
+            {copiedId ? '✓ Copied' : '📋 Copy ID'}
+          </button>
         </div>
       )}
+
+      {/* ── Main Content ── */}
+      <div className="flex-1 p-4">
+        {!sessionId ? (
+          /* Welcome state */
+          <div className="flex items-center justify-center" style={{ minHeight: '70vh' }}>
+            <div className="text-center glass-card p-10 max-w-md">
+              <div className="text-6xl mb-5">🏛️</div>
+              <h2 className="text-xl font-bold text-gray-800 mb-2">
+                Welcome to Linguist-Guardian
+              </h2>
+              <p className="text-gray-500 text-sm mb-6 leading-relaxed">
+                Start a new session to begin assisting customers.<br/>
+                They will be able to join your session automatically.
+              </p>
+              <button onClick={handleCreateSession} className="btn-primary">
+                + Start New Session
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Main layout — 2 columns */
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4" style={{ height: 'calc(100vh - 140px)' }}>
+            {/* Left: Chat + Input */}
+            <div className="lg:col-span-2 flex flex-col gap-3">
+              <div className="flex-1 min-h-0">
+                <ChatPanel
+                  messages={messages}
+                  onSpeak={speak}
+                  isSpeaking={isSpeaking}
+                  onStopSpeaking={stopSpeaking}
+                  speakLanguage="en"
+                  dashboardRole="staff"
+                />
+              </div>
+
+              {/* Input area */}
+              <div className="glass-card p-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={toggleListening}
+                    className={`p-2.5 rounded-lg transition-all ${
+                      isListening
+                        ? 'bg-red-600 text-white recording-pulse'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700'
+                    }`}
+                    title={isListening ? 'Stop listening' : 'Start voice input'}
+                  >
+                    {isListening ? '⏹️' : '🎙️'}
+                  </button>
+
+                  <input
+                    value={textInput}
+                    onChange={(e) => setTextInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={isListening ? 'Listening… Speak now' : 'Type a message in English…'}
+                    className="glass-input flex-1"
+                  />
+
+                  <button
+                    onClick={handleSendText}
+                    disabled={!textInput.trim()}
+                    className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Send ➤
+                  </button>
+                </div>
+
+                {isListening && (
+                  <div className="flex items-center justify-center gap-2 text-red-600 text-xs mt-2 animate-pulse-soft">
+                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                    Listening… Speak now in English
+                  </div>
+                )}
+                {speechError && (
+                  <div className="text-center text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg py-1.5 px-3 mt-2">
+                    ⚠️ {speechError}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Panels */}
+            <div className="space-y-3 overflow-y-auto">
+              <SentimentMeter stressScore={stressScore} deEscalate={deEscalate} />
+              <ComplianceAlerts alerts={alerts} />
+              <IntentGuidance detectedIntents={detectedIntents} />
+              <DocumentUpload />
+              <SessionSummary sessionId={sessionId} messages={messages} alerts={alerts} />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

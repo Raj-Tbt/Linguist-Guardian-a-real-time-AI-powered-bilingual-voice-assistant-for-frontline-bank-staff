@@ -1,11 +1,11 @@
-/**
- * Linguist-Guardian — WebSocket Hook.
+﻿/**
+ * Linguist-Guardian â€” WebSocket Hook.
  *
  * Manages the WebSocket connection lifecycle:
- *   • Auto-connect on mount
- *   • Reconnection with exponential backoff
- *   • Message parsing and dispatch to callbacks
- *   • Send helpers for text and binary data
+ *   â€¢ Auto-connect on mount
+ *   â€¢ Reconnection with exponential backoff
+ *   â€¢ Message parsing and dispatch to callbacks
+ *   â€¢ Send helpers for text and binary data
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';

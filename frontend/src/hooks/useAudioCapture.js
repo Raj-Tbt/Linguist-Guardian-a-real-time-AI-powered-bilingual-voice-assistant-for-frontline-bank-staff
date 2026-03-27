@@ -1,5 +1,5 @@
-/**
- * Linguist-Guardian — Audio Capture Hook (Press-to-Talk).
+﻿/**
+ * Linguist-Guardian â€” Audio Capture Hook (Press-to-Talk).
  *
  * Captures microphone audio as a SINGLE complete blob.
  * Audio is collected while the user holds the mic button,
@@ -68,7 +68,7 @@ export default function useAudioCapture(onAudioComplete) {
         stopRecording();
       };
 
-      // Start recording — collect data in 500ms intervals (internal only)
+      // Start recording â€” collect data in 500ms intervals (internal only)
       recorder.start(500);
       mediaRecorderRef.current = recorder;
       setIsRecording(true);
@@ -84,7 +84,7 @@ export default function useAudioCapture(onAudioComplete) {
   /** Stop recording, combine audio, and send ONE blob. */
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop(); // triggers onstop → sends combined blob
+      mediaRecorderRef.current.stop(); // triggers onstop â†’ sends combined blob
     }
 
     if (streamRef.current) {

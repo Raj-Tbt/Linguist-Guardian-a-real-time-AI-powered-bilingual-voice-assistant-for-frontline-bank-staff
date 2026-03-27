@@ -1,17 +1,16 @@
 /**
- * IntentGuidance — Dynamic step-by-step guidance for staff.
+ * IntentGuidance — Professional step-by-step guidance panel.
  *
- * Displays detected customer intents in real time with:
+ * Features:
  *   • Auto-detected intent badges
- *   • Step-by-step guidance for each intent
- *   • Collapsible sections for multiple intents
- *   • Step completion tracking (manual click-to-complete)
+ *   • Structured checklist with step numbers and icons
+ *   • Expandable sections with progress tracking
+ *   • Clean banking aesthetic
  */
 
 import { useState } from 'react';
 
 export default function IntentGuidance({ detectedIntents = [] }) {
-  // Track completed steps per intent: { intent_key: Set<step_id> }
   const [completedSteps, setCompletedSteps] = useState({});
 
   const toggleStep = (intentKey, stepId) => {
@@ -29,10 +28,11 @@ export default function IntentGuidance({ detectedIntents = [] }) {
   if (detectedIntents.length === 0) {
     return (
       <div className="glass-card p-4">
-        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-          🎯 Smart Guidance
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+          Smart Guidance
         </h3>
-        <div className="flex items-center gap-2 text-gray-500 text-sm">
+        <div className="flex items-center gap-2 text-gray-400 text-sm">
           <span className="text-lg">💬</span>
           <span>Waiting for customer query — guidance will appear automatically.</span>
         </div>
@@ -42,8 +42,9 @@ export default function IntentGuidance({ detectedIntents = [] }) {
 
   return (
     <div className="glass-card p-4">
-      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-        🎯 Smart Guidance
+      <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+        Smart Guidance
         <span className="badge-info text-[10px]">
           {detectedIntents.length} intent{detectedIntents.length > 1 ? 's' : ''} detected
         </span>
@@ -77,43 +78,42 @@ function IntentSection({ intent, completed, doneCount, totalSteps, progress, onT
   const [expanded, setExpanded] = useState(true);
 
   return (
-    <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 overflow-hidden">
+    <div className="rounded-lg border border-blue-200 bg-blue-50/50 overflow-hidden">
       {/* Intent header */}
       <button
         onClick={() => setExpanded((e) => !e)}
-        className="w-full flex items-center gap-2 p-3 hover:bg-white/5 transition-colors text-left"
+        className="w-full flex items-center gap-2 p-3 hover:bg-blue-50 transition-colors text-left"
       >
         <span className="text-lg">{intent.icon}</span>
-        <span className="text-sm font-semibold text-white flex-1">{intent.label}</span>
-        <span className="text-[10px] text-gray-500">
+        <span className="text-sm font-semibold text-gray-800 flex-1">{intent.label}</span>
+        <span className="text-[10px] text-gray-400">
           via "{intent.matched_keyword}"
         </span>
 
-        {/* Progress badge */}
-        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+        <span className={`text-[10px] px-2 py-0.5 rounded-md font-semibold ${
           progress === 100
-            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-            : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+            ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+            : 'bg-blue-100 text-blue-700 border border-blue-200'
         }`}>
           {doneCount}/{totalSteps}
         </span>
 
-        <span className={`text-xs text-gray-500 transition-transform ${expanded ? 'rotate-180' : ''}`}>
+        <span className={`text-xs text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`}>
           ▼
         </span>
       </button>
 
       {/* Progress bar */}
-      <div className="h-0.5 bg-white/5">
+      <div className="h-1 bg-gray-100">
         <div
           className={`h-full transition-all duration-500 ${
-            progress === 100 ? 'bg-emerald-500' : 'bg-indigo-500'
+            progress === 100 ? 'bg-emerald-500' : 'bg-blue-500'
           }`}
           style={{ width: `${progress}%` }}
         />
       </div>
 
-      {/* Steps list */}
+      {/* Steps */}
       {expanded && intent.steps && (
         <div className="p-2 space-y-1">
           {intent.steps.map((step, idx) => {
@@ -125,28 +125,26 @@ function IntentSection({ intent, completed, doneCount, totalSteps, progress, onT
                 onClick={() => onToggleStep(step.id)}
                 className={`w-full flex items-start gap-2.5 p-2 rounded-lg text-left transition-all ${
                   isDone
-                    ? 'bg-emerald-500/10 hover:bg-emerald-500/15'
-                    : 'hover:bg-white/5'
+                    ? 'bg-emerald-50 hover:bg-emerald-100'
+                    : 'hover:bg-gray-50'
                 }`}
               >
-                {/* Step number / checkmark */}
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5 border ${
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5 border-2 ${
                   isDone
                     ? 'bg-emerald-500 border-emerald-400 text-white'
-                    : 'bg-white/5 border-white/20 text-gray-500'
+                    : 'bg-white border-gray-300 text-gray-400'
                 }`}>
                   {isDone ? '✓' : idx + 1}
                 </div>
 
-                {/* Step content */}
                 <div className="flex-1 min-w-0">
                   <p className={`text-xs font-medium ${
-                    isDone ? 'text-emerald-400 line-through' : 'text-white'
+                    isDone ? 'text-emerald-700 line-through' : 'text-gray-800'
                   }`}>
                     {step.label}
                   </p>
                   {!isDone && step.detail && (
-                    <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">
+                    <p className="text-[10px] text-gray-400 mt-0.5 leading-snug">
                       {step.detail}
                     </p>
                   )}

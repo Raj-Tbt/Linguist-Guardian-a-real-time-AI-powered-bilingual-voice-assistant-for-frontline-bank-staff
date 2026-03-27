@@ -280,17 +280,18 @@ export default function SessionSummary({ sessionId, messages = [], alerts = [] }
   return (
     <div className="glass-card p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-          📝 Session Summary
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+          Session Summary
         </h3>
         <button
           onClick={handleDownloadPDF}
           disabled={downloading || !sessionId || messages.length === 0}
-          className="text-xs py-1.5 px-4 rounded-xl font-semibold transition-all
-                     bg-gradient-to-r from-indigo-500 to-purple-500 text-white
-                     hover:from-indigo-600 hover:to-purple-600
+          className="text-xs py-1.5 px-4 rounded-lg font-semibold transition-all
+                     bg-blue-600 text-white
+                     hover:bg-blue-700
                      disabled:opacity-40 disabled:cursor-not-allowed
-                     flex items-center gap-1.5 shadow-lg shadow-indigo-500/20"
+                     flex items-center gap-1.5 shadow-sm"
         >
           {downloading ? (
             <>
@@ -309,8 +310,8 @@ export default function SessionSummary({ sessionId, messages = [], alerts = [] }
 
       <p className="text-sm text-gray-500">
         {messages.length > 0
-          ? `${messages.length} messages ready — click "Download PDF" to save the full conversation.`
-          : 'Start a conversation, then download the full transcript as PDF.'
+          ? `${messages.length} messages ready — click "Download PDF" to save transcript.`
+          : 'Start a conversation, then download the transcript as PDF.'
         }
       </p>
     </div>

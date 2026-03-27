@@ -1,15 +1,15 @@
-/**
- * Linguist-Guardian — Speech Recognition Hook.
+﻿/**
+ * Linguist-Guardian â€” Speech Recognition Hook.
  *
  * Uses the browser's native Web Speech API (SpeechRecognition)
  * for real-time speech-to-text conversion.
  *
  * Key features:
- *   • Real-time transcription — text appears as you speak
- *   • Multilingual support — all 8 Indian languages + English
- *   • Text goes into the INPUT FIELD (not as a chat message)
- *   • Proper permission handling + error states
- *   • No backend calls needed — works entirely in-browser
+ *   â€¢ Real-time transcription â€” text appears as you speak
+ *   â€¢ Multilingual support â€” all 8 Indian languages + English
+ *   â€¢ Text goes into the INPUT FIELD (not as a chat message)
+ *   â€¢ Proper permission handling + error states
+ *   â€¢ No backend calls needed â€” works entirely in-browser
  */
 
 import { useCallback, useRef, useState } from 'react';
@@ -119,7 +119,7 @@ export default function useSpeechRecognition(onTranscript, language = 'en') {
       recognition.start();
       recognitionRef.current = recognition;
       setIsListening(true);
-      console.log('[SpeechRecognition] Started — lang:', recognition.lang);
+      console.log('[SpeechRecognition] Started â€” lang:', recognition.lang);
     } catch (err) {
       setError('Failed to start speech recognition.');
       console.error('[SpeechRecognition] Start failed:', err);

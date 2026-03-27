@@ -215,242 +215,118 @@ export default function CustomerDashboard() {
 
   // ── Render ─────────────────────────────────────────────────
   return (
-    <div className="min-h-screen p-4 lg:p-6 max-w-3xl mx-auto">
-      {/* Header */}
-      <header className="mb-6 text-center">
-        <h1 className="text-2xl font-bold gradient-text">
-          🏦 Union Bank of India
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          AI-Powered Multilingual Assistant — Customer View
-        </p>
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      {/* ── Top Navbar ── */}
+      <nav className="bank-navbar">
+        <div className="flex items-center gap-3">
+          <span className="text-xl">🏦</span>
+          <div>
+            <h1>Union Bank of India</h1>
+            <p className="subtitle">AI-Powered Multilingual Assistant</p>
+          </div>
+        </div>
 
         {sessionId && (
-          <div className="flex items-center justify-center gap-3 mt-3">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                isConnected ? 'bg-emerald-400 animate-pulse-soft' : 'bg-red-400'
-              }`}
-            />
-            <span className="text-xs text-gray-500">
-              {isConnected ? 'Connected' : 'Connecting…'}
-            </span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-white/10 rounded-lg px-2.5 py-1">
+              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse-soft' : 'bg-red-400'}`} />
+              <span className="text-[11px] text-white/80">{isConnected ? 'Connected' : 'Connecting…'}</span>
+            </div>
             {selectedLang && (
-              <span className="badge bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs">
-                {selectedLang.flag} {selectedLang.name}
-              </span>
+              <span className="bg-white/10 text-white/90 text-[11px] px-2.5 py-1 rounded-lg font-medium">{selectedLang.flag} {selectedLang.name}</span>
             )}
             {currentIntent && (
-              <span className="badge bg-purple-500/20 text-purple-400 border border-purple-500/30 text-xs">
-                {currentIntent.replace(/_/g, ' ')}
-              </span>
+              <span className="bg-white/10 text-white/90 text-[11px] px-2.5 py-1 rounded-lg font-medium">{currentIntent.replace(/_/g, ' ')}</span>
             )}
-            {/* Auto-Speech Toggle */}
-            <button
-              onClick={() => setAutoPlay(!autoPlay)}
-              className={`px-2 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
-                autoPlay
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-white/5 text-gray-500 border border-white/10'
-              }`}
-              title={autoPlay ? 'Auto-speech ON' : 'Auto-speech OFF'}
-            >
-              {autoPlay ? '🔊' : '🔇'}
-            </button>
-            {/* Auto-Mic Toggle */}
-            <button
-              onClick={() => setAutoMic(!autoMic)}
-              className={`px-2 py-1 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
-                autoMic
-                  ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-                  : 'bg-white/5 text-gray-500 border border-white/10'
-              }`}
-              title={autoMic ? 'Auto-mic ON' : 'Auto-mic OFF'}
-            >
-              {autoMic ? '🎙️' : '🎙️✗'}
-            </button>
+            <button onClick={() => setAutoPlay(!autoPlay)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${autoPlay ? 'bg-emerald-500/30 text-emerald-300' : 'bg-white/10 text-white/50'}`} title={autoPlay ? 'Auto-speech ON' : 'Auto-speech OFF'}>{autoPlay ? '🔊' : '🔇'}</button>
+            <button onClick={() => setAutoMic(!autoMic)} className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all ${autoMic ? 'bg-sky-500/30 text-sky-300' : 'bg-white/10 text-white/50'}`} title={autoMic ? 'Auto-mic ON' : 'Auto-mic OFF'}>{autoMic ? '🎙️' : '🎙️✗'}</button>
             {isSpeaking && (
-              <button
-                onClick={stopSpeaking}
-                className="px-2 py-1 rounded-lg text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-all"
-              >
-                ⏹
-              </button>
+              <button onClick={stopSpeaking} className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-amber-500/30 text-amber-300 transition-all">⏹</button>
             )}
           </div>
         )}
-      </header>
+      </nav>
 
-      {!sessionId ? (
-        /* Welcome screen */
-        <div className="flex items-center justify-center" style={{ minHeight: '60vh' }}>
-          <div className="text-center glass-card p-8 lg:p-12 max-w-lg w-full">
-            <div className="text-6xl mb-4">🙏</div>
-            <h2 className="text-xl font-semibold text-white mb-2">
-              नमस्ते! Welcome!
-            </h2>
-            <p className="text-gray-400 mb-6">
-              Select your preferred language and join a session to talk to our bank staff.
-            </p>
+      {/* ── Main Content ── */}
+      <div className="flex-1 p-4 max-w-3xl mx-auto w-full">
+        {!sessionId ? (
+          <div className="flex items-center justify-center" style={{ minHeight: '75vh' }}>
+            <div className="text-center glass-card p-8 lg:p-10 max-w-lg w-full">
+              <div className="text-5xl mb-4">🙏</div>
+              <h2 className="text-xl font-bold text-gray-800 mb-1">नमस्ते! Welcome!</h2>
+              <p className="text-gray-500 text-sm mb-6">Select your preferred language and join a session to talk to our bank staff.</p>
 
-            {/* Language selector — 8 Indian languages + English */}
-            <div className="mb-6">
-              <label className="block text-xs text-gray-500 mb-2 uppercase tracking-wider">
-                Your Language
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.code}
-                    onClick={() => setLanguage(lang.code)}
-                    className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                      language === lang.code
-                        ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 shadow-lg shadow-indigo-500/10'
-                        : 'bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10'
-                    }`}
-                  >
-                    {lang.flag} {lang.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Customer name input */}
-            <div className="mb-6">
-              <input
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Your name (optional)"
-                className="glass-input w-full text-center"
-              />
-            </div>
-
-            {/* Active sessions list — show ONLY the latest */}
-            <div className="mb-4">
-              <label className="block text-xs text-gray-500 mb-2 uppercase tracking-wider">
-                Available Session
-              </label>
-              {loadingSessions ? (
-                <div className="text-gray-500 text-sm py-4">Loading…</div>
-              ) : activeSessions.length === 0 ? (
-                <div className="text-gray-500 text-sm py-4 glass-card">
-                  <div className="text-3xl mb-2">⏳</div>
-                  No active sessions. Please wait for staff to create one.
+              <div className="mb-5">
+                <label className="block text-[11px] text-gray-400 mb-2 uppercase tracking-wider font-semibold">Your Language</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {LANGUAGES.map((lang) => (
+                    <button key={lang.code} onClick={() => setLanguage(lang.code)} className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all border ${language === lang.code ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300'}`}>
+                      {lang.flag} {lang.label}
+                    </button>
+                  ))}
                 </div>
-              ) : (
-                <div>
-                  {/* Show ONLY the first (latest) session */}
-                  <button
-                    onClick={() => handleJoinSession(activeSessions[0].id)}
-                    className="w-full glass-card-hover p-4 text-left flex items-center justify-between group"
-                  >
+              </div>
+
+              <div className="mb-5">
+                <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Your name (optional)" className="glass-input w-full text-center" />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-[11px] text-gray-400 mb-2 uppercase tracking-wider font-semibold">Available Session</label>
+                {loadingSessions ? (
+                  <div className="text-gray-400 text-sm py-4">Loading…</div>
+                ) : activeSessions.length === 0 ? (
+                  <div className="text-gray-500 text-sm py-4 glass-card p-4">
+                    <div className="text-3xl mb-2">⏳</div>
+                    No active sessions. Please wait for staff to create one.
+                  </div>
+                ) : (
+                  <button onClick={() => handleJoinSession(activeSessions[0].id)} className="w-full glass-card-hover p-4 text-left flex items-center justify-between group">
                     <div>
-                      <div className="text-sm text-white font-medium">
-                        {activeSessions[0].staff_name || 'Staff'} — {(activeSessions[0].process_type || 'general').replace(/_/g, ' ')}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        Tap to join this session
-                      </div>
+                      <div className="text-sm text-gray-800 font-medium">{activeSessions[0].staff_name || 'Staff'} — {(activeSessions[0].process_type || 'general').replace(/_/g, ' ')}</div>
+                      <div className="text-xs text-gray-400 mt-1">Tap to join this session</div>
                     </div>
-                    <span className="text-indigo-400 text-sm group-hover:translate-x-1 transition-transform">
-                      Join →
-                    </span>
+                    <span className="text-blue-600 text-sm font-semibold group-hover:translate-x-1 transition-transform">Join →</span>
                   </button>
+                )}
+              </div>
+
+              <button onClick={fetchSessions} className="text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">🔄 Refresh</button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col" style={{ height: 'calc(100vh - 100px)' }}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-gray-600 font-medium">💬 Active Conversation</span>
+              <button onClick={handleEndConversation} className="btn-danger text-xs">✕ End Conversation</button>
+            </div>
+
+            <div className="flex-1 min-h-0 mb-3">
+              <ChatPanel messages={messages} onSpeak={speak} isSpeaking={isSpeaking} onStopSpeaking={stopSpeaking} speakLanguage={language} dashboardRole="customer" />
+            </div>
+
+            <div className="glass-card p-3">
+              <div className="flex items-center gap-2">
+                <button onClick={toggleListening} className={`p-3 rounded-lg transition-all ${isListening ? 'bg-red-600 text-white recording-pulse' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'}`} title={isListening ? 'Stop listening' : 'Tap to speak'}>
+                  <span className="text-xl">{isListening ? '⏹️' : '🎙️'}</span>
+                </button>
+                <input value={textInput} onChange={(e) => setTextInput(e.target.value)} onKeyDown={handleKeyDown} placeholder={isListening ? `Listening in ${selectedLang?.name || 'your language'}…` : selectedLang?.code === 'en' ? 'Type or tap 🎙️ to speak…' : `Type in ${selectedLang?.name || 'your language'} or tap 🎙️…`} className="glass-input flex-1" />
+                <button onClick={handleSendText} disabled={!textInput.trim()} className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed">➤</button>
+              </div>
+              {isListening && (
+                <div className="mt-2 flex items-center justify-center gap-2 text-red-600 text-xs animate-pulse-soft">
+                  <span className="w-2 h-2 rounded-full bg-red-500" />
+                  Listening… Speak now in {selectedLang?.name || 'your language'}
                 </div>
               )}
+              {speechError && (
+                <div className="mt-2 text-center text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg py-2 px-3">⚠️ {speechError}</div>
+              )}
             </div>
-
-            <button
-              onClick={fetchSessions}
-              className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
-            >
-              🔄 Refresh
-            </button>
           </div>
-        </div>
-      ) : (
-        /* Chat interface */
-        <div className="flex flex-col h-[calc(100vh-180px)]">
-          {/* Chat header with End Conversation button */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400">💬 Active Conversation</span>
-            </div>
-            <button
-              onClick={handleEndConversation}
-              className="px-4 py-2 rounded-xl text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-all"
-            >
-              ✕ End Conversation
-            </button>
-          </div>
-
-          <div className="flex-1 min-h-0 mb-4">
-            <ChatPanel
-              messages={messages}
-              onSpeak={speak}
-              isSpeaking={isSpeaking}
-              onStopSpeaking={stopSpeaking}
-              speakLanguage={language}
-              dashboardRole="customer"
-            />
-          </div>
-
-          {/* Input area */}
-          <div className="glass-card p-4">
-            <div className="flex items-center gap-3">
-              {/* Large microphone button */}
-              <button
-                onClick={toggleListening}
-                className={`p-4 rounded-2xl transition-all ${
-                  isListening
-                    ? 'bg-red-500 text-white recording-pulse scale-110'
-                    : 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/30'
-                }`}
-                title={isListening ? 'Stop listening' : 'Tap to speak'}
-              >
-                <span className="text-2xl">{isListening ? '⏹️' : '🎙️'}</span>
-              </button>
-
-              {/* Text input */}
-              <div className="flex-1 flex gap-2">
-                <input
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={
-                    isListening
-                      ? `Listening in ${selectedLang?.name || 'your language'}…`
-                      : selectedLang?.code === 'en'
-                        ? 'Type or tap 🎙️ to speak…'
-                        : `Type in ${selectedLang?.name || 'your language'} or tap 🎙️…`
-                  }
-                  className="glass-input flex-1"
-                />
-                <button
-                  onClick={handleSendText}
-                  disabled={!textInput.trim()}
-                  className="btn-primary"
-                >
-                  ➤
-                </button>
-              </div>
-            </div>
-
-            {isListening && (
-              <div className="mt-3 flex items-center justify-center gap-2 text-red-400 text-sm animate-pulse-soft">
-                <span className="w-2 h-2 rounded-full bg-red-500" />
-                Listening… Speak now in {selectedLang?.name || 'your language'}
-              </div>
-            )}
-
-            {speechError && (
-              <div className="mt-3 text-center text-xs text-amber-400 bg-amber-500/10 rounded-lg py-2 px-3">
-                ⚠️ {speechError}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
+

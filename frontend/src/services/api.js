@@ -1,8 +1,8 @@
-/**
- * Linguist-Guardian — REST API Client.
+﻿/**
+ * Linguist-Guardian â€” REST API Client.
  *
  * Provides typed helper functions for all backend endpoints.
- * Base URL is relative (Vite proxy routes /api → backend).
+ * Base URL is relative (Vite proxy routes /api â†’ backend).
  */
 
 const BASE_URL = '/api';
@@ -25,7 +25,7 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-// ── Sessions ─────────────────────────────────────────────────
+// â”€â”€ Sessions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function createSession(data) {
   return request('/sessions', {
@@ -57,7 +57,7 @@ export async function endSession(sessionId) {
   return request(`/sessions/${sessionId}/end`, { method: 'POST' });
 }
 
-// ── Messages ─────────────────────────────────────────────────
+// â”€â”€ Messages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function getMessages(sessionId) {
   return request(`/sessions/${sessionId}/messages`);
@@ -70,7 +70,7 @@ export async function addMessage(sessionId, data) {
   });
 }
 
-// ── Compliance ───────────────────────────────────────────────
+// â”€â”€ Compliance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function checkCompliance(sessionId, text) {
   return request(`/sessions/${sessionId}/compliance-check`, {
@@ -83,7 +83,7 @@ export async function getComplianceAlerts(sessionId) {
   return request(`/sessions/${sessionId}/compliance-alerts`);
 }
 
-// ── Document Verification ────────────────────────────────────
+// â”€â”€ Document Verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function verifyDocument(data) {
   return request('/verify-document', {
@@ -101,7 +101,7 @@ export async function verifyDocumentUpload(file, documentType = 'aadhaar') {
   const res = await fetch(url, {
     method: 'POST',
     body: formData,
-    // Don't set Content-Type — browser sets multipart boundary automatically
+    // Don't set Content-Type â€” browser sets multipart boundary automatically
   });
 
   if (!res.ok) {
@@ -112,7 +112,7 @@ export async function verifyDocumentUpload(file, documentType = 'aadhaar') {
   return res.json();
 }
 
-// ── FSM ──────────────────────────────────────────────────────
+// â”€â”€ FSM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function getFSMState(sessionId) {
   return request(`/sessions/${sessionId}/fsm-state`);
@@ -125,7 +125,7 @@ export async function advanceFSM(sessionId, targetState) {
   });
 }
 
-// ── Summary ──────────────────────────────────────────────────
+// â”€â”€ Summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function generateSummary(sessionId) {
   return request(`/sessions/${sessionId}/summary`, {
@@ -133,7 +133,7 @@ export async function generateSummary(sessionId) {
   });
 }
 
-// ── GenAI ────────────────────────────────────────────────────
+// â”€â”€ GenAI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function processText(text, targetLanguage = null) {
   const params = new URLSearchParams({ text });
@@ -141,14 +141,14 @@ export async function processText(text, targetLanguage = null) {
   return request(`/genai/process?${params}`, { method: 'POST' });
 }
 
-// ── Voice Response ───────────────────────────────────────────
+// â”€â”€ Voice Response â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function getVoiceResponse(intent = 'general_query', language = 'en') {
   const params = new URLSearchParams({ intent, language });
   return request(`/voice-response?${params}`, { method: 'POST' });
 }
 
-// ── Fake Users ───────────────────────────────────────────────
+// â”€â”€ Fake Users â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export async function listFakeUsers() {
   return request('/fake-users');

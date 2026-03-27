@@ -1,15 +1,15 @@
-/**
- * Linguist-Guardian — Multilingual Text-to-Speech Hook.
+﻿/**
+ * Linguist-Guardian â€” Multilingual Text-to-Speech Hook.
  *
  * Two-tier TTS strategy for minimal latency:
- *   1. **Indian languages** → Sarvam AI TTS API via backend (real AI voice)
- *   2. **English** → Browser native SpeechSynthesis (instant, no API call)
+ *   1. **Indian languages** â†’ Sarvam AI TTS API via backend (real AI voice)
+ *   2. **English** â†’ Browser native SpeechSynthesis (instant, no API call)
  *
  * Features:
- *   • Auto-play mode — automatically speaks incoming messages
- *   • Message queue — handles rapid incoming messages without overlap
- *   • Mute toggle — enable/disable auto-play
- *   • Deduplication — prevents replaying the same message
+ *   â€¢ Auto-play mode â€” automatically speaks incoming messages
+ *   â€¢ Message queue â€” handles rapid incoming messages without overlap
+ *   â€¢ Mute toggle â€” enable/disable auto-play
+ *   â€¢ Deduplication â€” prevents replaying the same message
  *
  * Supports: Hindi, Marathi, Tamil, Telugu, Bengali, Gujarati, Kannada, Malayalam, English
  */
@@ -181,7 +181,7 @@ export default function useTextToSpeech(defaultLanguage = 'en') {
   }, [defaultLanguage, stop, _speakBrowser, _speakSarvam]);
 
   /**
-   * Process the TTS queue — plays messages one by one.
+   * Process the TTS queue â€” plays messages one by one.
    */
   const _processQueue = useCallback(async () => {
     if (processingRef.current) return;

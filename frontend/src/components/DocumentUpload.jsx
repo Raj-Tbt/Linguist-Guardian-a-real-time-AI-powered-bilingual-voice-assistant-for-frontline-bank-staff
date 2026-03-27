@@ -1,5 +1,5 @@
 /**
- * DocumentUpload — AI-powered document verification via image upload.
+ * DocumentUpload â€” AI-powered document verification via image upload.
  *
  * Workflow:
  *   1. Staff selects document type (Aadhaar / PAN)
@@ -14,11 +14,11 @@ import { useState, useRef } from 'react';
 import { verifyDocumentUpload } from '../services/api';
 
 const STATUS_CONFIG = {
-  verified: { icon: '✅', label: 'Verified', color: 'emerald', desc: 'All fields match database records.' },
-  needs_review: { icon: '⚠️', label: 'Needs Review', color: 'amber', desc: 'Partial match — some fields need manual review.' },
-  not_verified: { icon: '❌', label: 'Not Verified', color: 'red', desc: 'Document data does not match any records.' },
-  not_found: { icon: '🔍', label: 'No Match Found', color: 'red', desc: 'No matching user found in the database.' },
-  rejected: { icon: '🚫', label: 'Rejected', color: 'red', desc: 'Image could not be processed.' },
+  verified: { icon: 'âœ…', label: 'Verified', color: 'emerald', desc: 'All fields match database records.' },
+  needs_review: { icon: 'âš ï¸', label: 'Needs Review', color: 'amber', desc: 'Partial match â€” some fields need manual review.' },
+  not_verified: { icon: 'âŒ', label: 'Not Verified', color: 'red', desc: 'Document data does not match any records.' },
+  not_found: { icon: 'ðŸ”', label: 'No Match Found', color: 'red', desc: 'No matching user found in the database.' },
+  rejected: { icon: 'ðŸš«', label: 'Rejected', color: 'red', desc: 'Image could not be processed.' },
 };
 
 export default function DocumentUpload() {
@@ -86,7 +86,7 @@ export default function DocumentUpload() {
   return (
     <div className="glass-card p-4">
       <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-        📄 Document Verification
+        ðŸ“„ Document Verification
       </h3>
 
       {/* Document type selector */}
@@ -95,13 +95,13 @@ export default function DocumentUpload() {
           <button
             key={type}
             onClick={() => { setDocType(type); setResult(null); }}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all border ${
               docType === type
-                ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-500/40'
-                : 'bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10'
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
             }`}
           >
-            {type === 'aadhaar' ? '🪪 Aadhaar' : '💳 PAN'}
+            {type === 'aadhaar' ? 'ðŸªª Aadhaar' : 'ðŸ’³ PAN'}
           </button>
         ))}
       </div>
@@ -111,8 +111,8 @@ export default function DocumentUpload() {
         <div
           className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
             dragOver
-              ? 'border-indigo-400 bg-indigo-500/10'
-              : 'border-white/20 hover:border-indigo-400/50 hover:bg-white/5'
+              ? 'border-blue-400 bg-blue-50'
+              : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
           }`}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
@@ -126,19 +126,19 @@ export default function DocumentUpload() {
             className="hidden"
             onChange={(e) => handleFile(e.target.files[0])}
           />
-          <div className="text-3xl mb-2">📷</div>
+          <div className="text-3xl mb-2">ðŸ“·</div>
           <p className="text-sm text-gray-400">
             Drag & drop {docType === 'aadhaar' ? 'Aadhaar' : 'PAN'} card image here
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            or click to browse • JPEG, PNG, WebP
+            or click to browse â€¢ JPEG, PNG, WebP
           </p>
         </div>
       ) : (
-        /* File selected — show preview + verify button */
+        /* File selected â€” show preview + verify button */
         <div className="space-y-3">
           {/* Image preview */}
-          <div className="relative rounded-xl overflow-hidden border border-white/10">
+          <div className="relative rounded-xl overflow-hidden border border-gray-200">
             <img
               src={preview}
               alt="Document preview"
@@ -148,11 +148,11 @@ export default function DocumentUpload() {
               onClick={handleReset}
               className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center hover:bg-red-500 transition-colors"
             >
-              ✕
+              âœ•
             </button>
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
               <p className="text-xs text-gray-300 truncate">{file.name}</p>
-              <p className="text-[10px] text-gray-500">{(file.size / 1024).toFixed(0)} KB • {docType.toUpperCase()}</p>
+              <p className="text-[10px] text-gray-500">{(file.size / 1024).toFixed(0)} KB â€¢ {docType.toUpperCase()}</p>
             </div>
           </div>
 
@@ -164,23 +164,23 @@ export default function DocumentUpload() {
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="animate-spin">⏳</span> Processing… Extracting data with AI Vision
+                <span className="animate-spin">â³</span> Processingâ€¦ Extracting data with AI Vision
               </span>
-            ) : '🔍 Verify Document'}
+            ) : 'ðŸ” Verify Document'}
           </button>
         </div>
       )}
 
       {/* Error */}
       {error && (
-        <div className="mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm">
-          <p className="text-red-400">{error}</p>
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm">
+          <p className="text-red-600">{error}</p>
           <button
             onClick={handleVerify}
             disabled={loading}
-            className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+            className="mt-2 text-xs text-blue-600 hover:text-blue-800 transition-colors"
           >
-            🔄 Retry Verification
+            ðŸ”„ Retry Verification
           </button>
         </div>
       )}
@@ -201,15 +201,15 @@ export default function DocumentUpload() {
           >
             <span className="text-lg">{statusInfo.icon}</span>
             <span className={`text-lg font-semibold ml-2 ${
-              statusInfo.color === 'emerald' ? 'text-emerald-400'
-              : statusInfo.color === 'amber' ? 'text-amber-400'
-              : 'text-red-400'
+              statusInfo.color === 'emerald' ? 'text-emerald-600'
+              : statusInfo.color === 'amber' ? 'text-amber-600'
+              : 'text-red-600'
             }`}>
               {statusInfo.label}
             </span>
             <p className="text-xs text-gray-400 mt-1">{statusInfo.desc}</p>
             {result.overall_confidence != null && (
-              <p className="text-xs text-indigo-400 font-mono mt-1">
+              <p className="text-xs text-blue-600 font-mono mt-1">
                 Overall Match: {(result.overall_confidence * 100).toFixed(1)}%
               </p>
             )}
@@ -217,36 +217,36 @@ export default function DocumentUpload() {
 
           {/* Extracted data preview */}
           {result.extraction && !result.extraction.error && (
-            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+            <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
               <h4 className="text-xs text-gray-500 uppercase tracking-wider mb-2">
                 AI Extracted Data
               </h4>
               <div className="space-y-1">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Name</span>
-                  <span className="text-white font-medium">{result.extraction.extracted_name || '—'}</span>
+                  <span className="text-gray-800 font-medium">{result.extraction.extracted_name || 'â€”'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Number</span>
-                  <span className="text-white font-mono text-xs">{result.extraction.extracted_number || '—'}</span>
+                  <span className="text-gray-800 font-mono text-xs">{result.extraction.extracted_number || 'â€”'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">DOB</span>
-                  <span className="text-white">{result.extraction.extracted_dob || '—'}</span>
+                  <span className="text-gray-800">{result.extraction.extracted_dob || 'â€”'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Quality</span>
                   <span className={`text-xs font-medium ${
-                    result.extraction.quality === 'good' ? 'text-emerald-400'
-                    : result.extraction.quality === 'fair' ? 'text-amber-400'
-                    : 'text-red-400'
+                    result.extraction.quality === 'good' ? 'text-emerald-600'
+                    : result.extraction.quality === 'fair' ? 'text-amber-600'
+                    : 'text-red-600'
                   }`}>
                     {result.extraction.quality?.toUpperCase() || 'N/A'}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Confidence</span>
-                  <span className="text-indigo-400 font-mono text-xs">
+                  <span className="text-blue-600 font-mono text-xs">
                     {((result.extraction.confidence || 0) * 100).toFixed(1)}%
                   </span>
                 </div>
@@ -260,22 +260,22 @@ export default function DocumentUpload() {
               key={idx}
               className={`p-2.5 rounded-lg border text-sm ${
                 r.match
-                  ? 'bg-emerald-500/5 border-emerald-500/20'
-                  : 'bg-red-500/5 border-red-500/20'
+                  ? 'bg-emerald-50 border-emerald-200'
+                  : 'bg-red-50 border-red-200'
               }`}
             >
               <div className="flex justify-between items-center">
-                <span className="font-medium text-gray-300 capitalize">
+                <span className="font-medium text-gray-700 capitalize">
                   {r.field.replace(/_/g, ' ')}
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-gray-500">{r.method}</span>
                   <span className={`text-xs font-mono ${
-                    r.match ? 'text-emerald-400' : 'text-red-400'
+                    r.match ? 'text-emerald-600' : 'text-red-600'
                   }`}>
                     {(r.score * 100).toFixed(1)}%
                   </span>
-                  <span>{r.match ? '✓' : '✗'}</span>
+                  <span>{r.match ? 'âœ“' : 'âœ—'}</span>
                 </div>
               </div>
               <div className="flex gap-4 mt-1 text-[10px] text-gray-500">
@@ -288,12 +288,13 @@ export default function DocumentUpload() {
           {/* Verify another */}
           <button
             onClick={handleReset}
-            className="w-full text-xs text-indigo-400 hover:text-indigo-300 transition-colors py-2"
+            className="w-full text-xs text-blue-600 hover:text-blue-800 transition-colors py-2"
           >
-            🔄 Verify Another Document
+            ðŸ”„ Verify Another Document
           </button>
         </div>
       )}
     </div>
   );
 }
+

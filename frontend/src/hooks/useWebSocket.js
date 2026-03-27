@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Linguist-Guardian â€” WebSocket Hook.
  *
  * Manages the WebSocket connection lifecycle:
@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const WS_BASE = `ws://localhost:8000/ws`;
+const WS_BASE = `ws://${window.location.hostname}:8000/ws`;
 const MAX_RECONNECT_DELAY = 10000; // 10 seconds
 
 export default function useWebSocket(sessionId, onMessage) {

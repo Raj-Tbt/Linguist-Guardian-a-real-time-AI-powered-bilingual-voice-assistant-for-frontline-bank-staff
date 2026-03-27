@@ -1,11 +1,11 @@
-﻿/**
+/**
  * Linguist-Guardian â€” REST API Client.
  *
  * Provides typed helper functions for all backend endpoints.
  * Base URL is relative (Vite proxy routes /api â†’ backend).
  */
 
-const BASE_URL = '/api';
+const BASE_URL = `http://${window.location.hostname}:8000/api`;
 
 /**
  * Generic fetch wrapper with JSON parsing and error handling.

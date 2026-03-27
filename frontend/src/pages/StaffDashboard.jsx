@@ -20,6 +20,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import useWebSocket from '../hooks/useWebSocket';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import useTextToSpeech from '../hooks/useTextToSpeech';
@@ -245,6 +246,12 @@ export default function StaffDashboard() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Home button — only on welcome screen */}
+          {!sessionId && (
+            <Link to="/" className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white/80 hover:text-white text-[11px] font-medium" title="Back to Home">
+              ← Home
+            </Link>
+          )}
           {/* Connection status */}
           <div className="flex items-center gap-1.5 bg-white/10 rounded-lg px-2.5 py-1">
             <span

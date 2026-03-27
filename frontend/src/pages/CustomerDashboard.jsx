@@ -11,6 +11,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import useWebSocket from '../hooks/useWebSocket';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 import useTextToSpeech from '../hooks/useTextToSpeech';
@@ -225,9 +226,15 @@ export default function CustomerDashboard() {
             <p className="subtitle">AI-Powered Multilingual Assistant - Customer Dashboard</p>
           </div>
         </div>
-
+        <div className="flex items-center gap-2">
+          {/* Home button — only on welcome screen */}
+          {!sessionId && (
+            <Link to="/" className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white/80 hover:text-white text-[11px] font-medium" title="Back to Home">
+              ← Home
+            </Link>
+          )}
         {sessionId && (
-          <div className="flex items-center gap-2">
+          <>
             <div className="flex items-center gap-1.5 bg-white/10 rounded-lg px-2.5 py-1">
               <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse-soft' : 'bg-red-400'}`} />
               <span className="text-[11px] text-white/80">{isConnected ? 'Connected' : 'Connecting…'}</span>
@@ -243,8 +250,9 @@ export default function CustomerDashboard() {
             {isSpeaking && (
               <button onClick={stopSpeaking} className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-amber-500/30 text-amber-300 transition-all">⏹</button>
             )}
-          </div>
+          </>
         )}
+        </div>
       </nav>
 
       {/* ── Main Content ── */}

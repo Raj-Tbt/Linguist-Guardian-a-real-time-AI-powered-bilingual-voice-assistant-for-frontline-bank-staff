@@ -240,7 +240,7 @@ export default function StaffDashboard() {
           <span className="text-xl">🏛️</span>
           <div>
             <h1>Linguist-Guardian</h1>
-            <p className="subtitle">Staff Dashboard — Union Bank of India</p>
+            <p className="subtitle">AI-Powered Multilingual Assistant - Staff Dashboard</p>
           </div>
         </div>
 

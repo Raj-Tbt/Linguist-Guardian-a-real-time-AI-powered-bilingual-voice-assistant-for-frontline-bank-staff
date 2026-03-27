@@ -12,7 +12,7 @@ function LandingPage() {
           <div className="w-20 h-20 rounded-2xl bg-blue-700 flex items-center justify-center text-white font-bold text-2xl mx-auto mb-5">LG</div>
           <h1 className="text-4xl font-extrabold text-slate-800 mb-3">Linguist-Guardian</h1>
           <p className="text-slate-500 text-lg max-w-md mx-auto leading-relaxed">
-            Real-Time AI Banking Assistant for Union Bank of India
+            Real-Time AI Banking Assistant for Banks of India
           </p>
         </div>
 

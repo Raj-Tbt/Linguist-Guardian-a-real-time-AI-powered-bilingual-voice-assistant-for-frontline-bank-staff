@@ -1,5 +1,5 @@
 /**
- * DocumentUpload â€” AI-powered document verification via image upload.
+ * DocumentUpload — AI-powered document verification via image upload.
  *
  * Workflow:
  *   1. Staff selects document type (Aadhaar / PAN)
@@ -14,11 +14,11 @@ import { useState, useRef } from 'react';
 import { verifyDocumentUpload } from '../services/api';
 
 const STATUS_CONFIG = {
-  verified: { icon: 'âœ…', label: 'Verified', color: 'emerald', desc: 'All fields match database records.' },
-  needs_review: { icon: 'âš ï¸', label: 'Needs Review', color: 'amber', desc: 'Partial match â€” some fields need manual review.' },
-  not_verified: { icon: 'âŒ', label: 'Not Verified', color: 'red', desc: 'Document data does not match any records.' },
-  not_found: { icon: 'ðŸ”', label: 'No Match Found', color: 'red', desc: 'No matching user found in the database.' },
-  rejected: { icon: 'ðŸš«', label: 'Rejected', color: 'red', desc: 'Image could not be processed.' },
+  verified: { icon: '✅', label: 'Verified', color: 'emerald', desc: 'All fields match database records.' },
+  needs_review: { icon: '⚠️', label: 'Needs Review', color: 'amber', desc: 'Partial match — some fields need manual review.' },
+  not_verified: { icon: '❌', label: 'Not Verified', color: 'red', desc: 'Document data does not match any records.' },
+  not_found: { icon: '🔍', label: 'No Match Found', color: 'red', desc: 'No matching user found in the database.' },
+  rejected: { icon: '🚫', label: 'Rejected', color: 'red', desc: 'Image could not be processed.' },
 };
 
 export default function DocumentUpload() {
@@ -33,12 +33,10 @@ export default function DocumentUpload() {
 
   const handleFile = (f) => {
     if (!f) return;
-    // Validate type
     if (!f.type.startsWith('image/')) {
       setError('Please upload an image file (JPEG, PNG, or WebP).');
       return;
     }
-    // Validate size (max 10MB)
     if (f.size > 10 * 1024 * 1024) {
       setError('Image too large. Max 10 MB.');
       return;
@@ -46,7 +44,6 @@ export default function DocumentUpload() {
     setFile(f);
     setError(null);
     setResult(null);
-    // Create preview
     const reader = new FileReader();
     reader.onload = (e) => setPreview(e.target.result);
     reader.readAsDataURL(f);
@@ -85,8 +82,9 @@ export default function DocumentUpload() {
 
   return (
     <div className="glass-card p-4">
-      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
-        ðŸ“„ Document Verification
+      <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+        Document Verification
       </h3>
 
       {/* Document type selector */}
@@ -101,7 +99,7 @@ export default function DocumentUpload() {
                 : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
             }`}
           >
-            {type === 'aadhaar' ? 'ðŸªª Aadhaar' : 'ðŸ’³ PAN'}
+            {type === 'aadhaar' ? '🪪 Aadhaar' : '💳 PAN'}
           </button>
         ))}
       </div>
@@ -126,16 +124,16 @@ export default function DocumentUpload() {
             className="hidden"
             onChange={(e) => handleFile(e.target.files[0])}
           />
-          <div className="text-3xl mb-2">ðŸ“·</div>
-          <p className="text-sm text-gray-400">
+          <div className="text-3xl mb-2">📷</div>
+          <p className="text-sm text-gray-500">
             Drag & drop {docType === 'aadhaar' ? 'Aadhaar' : 'PAN'} card image here
           </p>
-          <p className="text-xs text-gray-500 mt-1">
-            or click to browse â€¢ JPEG, PNG, WebP
+          <p className="text-xs text-gray-400 mt-1">
+            or click to browse • JPEG, PNG, WebP
           </p>
         </div>
       ) : (
-        /* File selected â€” show preview + verify button */
+        /* File selected — show preview + verify button */
         <div className="space-y-3">
           {/* Image preview */}
           <div className="relative rounded-xl overflow-hidden border border-gray-200">
@@ -148,11 +146,11 @@ export default function DocumentUpload() {
               onClick={handleReset}
               className="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/60 text-white text-xs flex items-center justify-center hover:bg-red-500 transition-colors"
             >
-              âœ•
+              ✕
             </button>
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-              <p className="text-xs text-gray-300 truncate">{file.name}</p>
-              <p className="text-[10px] text-gray-500">{(file.size / 1024).toFixed(0)} KB â€¢ {docType.toUpperCase()}</p>
+              <p className="text-xs text-white truncate">{file.name}</p>
+              <p className="text-[10px] text-gray-300">{(file.size / 1024).toFixed(0)} KB • {docType.toUpperCase()}</p>
             </div>
           </div>
 
@@ -164,9 +162,9 @@ export default function DocumentUpload() {
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="animate-spin">â³</span> Processingâ€¦ Extracting data with AI Vision
+                <span className="animate-spin">⏳</span> Processing… Extracting data with AI Vision
               </span>
-            ) : 'ðŸ” Verify Document'}
+            ) : '🔍 Verify Document'}
           </button>
         </div>
       )}
@@ -180,7 +178,7 @@ export default function DocumentUpload() {
             disabled={loading}
             className="mt-2 text-xs text-blue-600 hover:text-blue-800 transition-colors"
           >
-            ðŸ”„ Retry Verification
+            🔄 Retry Verification
           </button>
         </div>
       )}
@@ -189,7 +187,7 @@ export default function DocumentUpload() {
       {result && statusInfo && (
         <div className="mt-4 space-y-3 animate-slide-up">
           {/* Status banner */}
-          <div className={`p-3 rounded-lg border text-center bg-${statusInfo.color}-500/10 border-${statusInfo.color}-500/30`}
+          <div className="p-3 rounded-lg border text-center"
             style={{
               backgroundColor: statusInfo.color === 'emerald' ? 'rgba(16,185,129,0.1)'
                 : statusInfo.color === 'amber' ? 'rgba(245,158,11,0.1)'
@@ -207,7 +205,7 @@ export default function DocumentUpload() {
             }`}>
               {statusInfo.label}
             </span>
-            <p className="text-xs text-gray-400 mt-1">{statusInfo.desc}</p>
+            <p className="text-xs text-gray-500 mt-1">{statusInfo.desc}</p>
             {result.overall_confidence != null && (
               <p className="text-xs text-blue-600 font-mono mt-1">
                 Overall Match: {(result.overall_confidence * 100).toFixed(1)}%
@@ -224,15 +222,15 @@ export default function DocumentUpload() {
               <div className="space-y-1">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Name</span>
-                  <span className="text-gray-800 font-medium">{result.extraction.extracted_name || 'â€”'}</span>
+                  <span className="text-gray-800 font-medium">{result.extraction.extracted_name || '—'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Number</span>
-                  <span className="text-gray-800 font-mono text-xs">{result.extraction.extracted_number || 'â€”'}</span>
+                  <span className="text-gray-800 font-mono text-xs">{result.extraction.extracted_number || '—'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">DOB</span>
-                  <span className="text-gray-800">{result.extraction.extracted_dob || 'â€”'}</span>
+                  <span className="text-gray-800">{result.extraction.extracted_dob || '—'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400">Quality</span>
@@ -275,7 +273,7 @@ export default function DocumentUpload() {
                   }`}>
                     {(r.score * 100).toFixed(1)}%
                   </span>
-                  <span>{r.match ? 'âœ“' : 'âœ—'}</span>
+                  <span>{r.match ? '✔' : '✗'}</span>
                 </div>
               </div>
               <div className="flex gap-4 mt-1 text-[10px] text-gray-500">
@@ -290,11 +288,10 @@ export default function DocumentUpload() {
             onClick={handleReset}
             className="w-full text-xs text-blue-600 hover:text-blue-800 transition-colors py-2"
           >
-            ðŸ”„ Verify Another Document
+            🔄 Verify Another Document
           </button>
         </div>
       )}
     </div>
   );
 }
-

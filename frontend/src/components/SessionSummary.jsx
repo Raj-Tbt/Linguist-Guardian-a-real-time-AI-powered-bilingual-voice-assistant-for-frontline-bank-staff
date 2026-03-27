@@ -241,7 +241,7 @@ export default function SessionSummary({ sessionId, messages = [], alerts = [] }
   <div class="header">
     <h1>Linguist-Guardian</h1>
     <div class="subtitle">Session Conversation Report</div>
-    <div class="org">Union Bank of India — AI-Powered Multilingual Banking Assistant</div>
+    <div class="org">AI-Powered Multilingual Banking Assistant</div>
   </div>
 
   <!-- Session Info -->
@@ -269,7 +269,7 @@ export default function SessionSummary({ sessionId, messages = [], alerts = [] }
 
   <!-- Footer -->
   <div class="footer">
-    Linguist-Guardian — Union Bank of India — AI-Powered Multilingual Banking Assistant<br>
+    Linguist-Guardian — AI-Powered Multilingual Banking Assistant<br>
     Generated on ${dateStr} at ${timeStr}
   </div>
 </body>

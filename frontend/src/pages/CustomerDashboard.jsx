@@ -221,8 +221,8 @@ export default function CustomerDashboard() {
         <div className="flex items-center gap-3">
           <span className="text-xl">🏦</span>
           <div>
-            <h1>Union Bank of India</h1>
-            <p className="subtitle">AI-Powered Multilingual Assistant</p>
+            <h1>Linguist-Guardian</h1>
+            <p className="subtitle">AI-Powered Multilingual Assistant - Customer Dashboard</p>
           </div>
         </div>
 
